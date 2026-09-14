@@ -704,7 +704,7 @@ function JournalEntryDetailsPanel({
             {entry.sourceType === "manual" ? "Manual Journal" : sourceLabel(entry.sourceType)}
           </p>
           <div className="mt-1 flex flex-wrap items-center gap-3">
-            <h2 className="text-3xl font-bold tracking-tight text-brand-espresso">
+            <h2 className="text-3xl font-semibold tracking-tight text-brand-espresso">
               {displayText(entry.entryNumber, "Draft journal")}
             </h2>
             <Badge variant={statusBadgeVariant(entry.status)}>{statusLabel(entry.status)}</Badge>
@@ -789,7 +789,7 @@ function JournalEntryDetailsPanel({
           <CardContent className="grid gap-6 p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-2xl font-bold text-brand-espresso">
+                <span className="text-2xl font-semibold text-brand-espresso">
                   {displayText(entry.entryNumber, "Draft journal")}
                 </span>
                 <Badge variant={statusBadgeVariant(entry.status)}>
@@ -888,14 +888,14 @@ function JournalEntryDetailsPanel({
                   <TableRow>
                     <TableCell
                       colSpan={2}
-                      className="text-right text-lg font-bold text-brand-espresso"
+                      className="text-right text-lg font-semibold text-brand-espresso"
                     >
                       Total Amount
                     </TableCell>
-                    <TableCell className="text-right text-lg font-bold text-brand-espresso">
+                    <TableCell className="text-right text-lg font-semibold text-brand-espresso">
                       {money(entry.totalDebit)}
                     </TableCell>
-                    <TableCell className="text-right text-lg font-bold text-brand-espresso">
+                    <TableCell className="text-right text-lg font-semibold text-brand-espresso">
                       {money(entry.totalCredit)}
                     </TableCell>
                   </TableRow>
@@ -1116,7 +1116,9 @@ export function JournalEntriesPageClient(): JSX.Element {
               <div className="flex items-center justify-between gap-3 border-b border-brand-cappuccino/70 px-4 py-4">
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-bold text-brand-espresso">{journalViewLabel}</h2>
+                    <h2 className="text-lg font-semibold text-brand-espresso">
+                      {journalViewLabel}
+                    </h2>
                     <Badge variant="outline">{totalEntries}</Badge>
                   </div>
                   <p className="text-xs text-brand-mocha">{journalViewDescription}</p>
@@ -1298,7 +1300,7 @@ export function JournalEntriesPageClient(): JSX.Element {
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <p className="truncate text-sm font-bold text-brand-espresso">
+                              <p className="truncate text-sm font-semibold text-brand-espresso">
                                 {displayText(entry.entryNumber, "Draft journal")}
                               </p>
                               <p className="mt-1 text-xs text-brand-mocha">
@@ -1319,7 +1321,7 @@ export function JournalEntriesPageClient(): JSX.Element {
                                 "No reference",
                               )}
                             </p>
-                            <p className="whitespace-nowrap text-sm font-bold text-brand-espresso">
+                            <p className="whitespace-nowrap text-sm font-semibold text-brand-espresso">
                               {money(entry.totalDebit)}
                             </p>
                           </div>

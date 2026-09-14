@@ -42,14 +42,14 @@ export function BatchWastageSection({ wastage }: { wastage: ProductionWastage[] 
     <section className="rounded-2xl border border-danger/30 bg-card p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-sm font-bold text-danger-text">Production Wastage</h2>
+          <h2 className="text-sm font-semibold text-danger-text">Production Wastage</h2>
           <p className="mt-1 text-sm text-foreground-muted">
             Backend-recorded losses and stock movements for this production.
           </p>
         </div>
       </div>
       <div className="mt-5 rounded-xl bg-danger-tint p-4">
-        <p className="text-xs font-bold text-danger-text">Loss value</p>
+        <p className="text-xs font-semibold text-danger-text">Loss value</p>
         <p className="mt-2 font-mono text-2xl font-semibold text-danger-text">
           {formatMoney(totalCost)}
         </p>

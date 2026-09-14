@@ -34,7 +34,7 @@ export function BatchOutputSection({ outputs }: { outputs: ProductionOutput[] })
     <section className="rounded-2xl bg-primary p-6 text-primary-foreground">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-sm font-bold text-primary-foreground/70">Finished Output</h2>
+          <h2 className="text-sm font-semibold text-primary-foreground/70">Finished Output</h2>
           <p className="mt-6 font-mono text-5xl font-semibold">{totalQuantity}</p>
           <p className="mt-2 text-primary-foreground/70">
             {outputs[0] ? outputMeta(outputs[0]) : "No output recorded yet"}

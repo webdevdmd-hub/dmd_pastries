@@ -295,7 +295,7 @@ export function TrialBalancePageClient(): JSX.Element {
               <div className="mx-auto max-w-5xl md:min-w-[48rem]">
                 <div className="mb-8 text-center">
                   <p className="text-sm font-medium text-foreground-muted">Accrual basis</p>
-                  <h2 className="mt-2 text-2xl font-bold text-foreground">Trial Balance</h2>
+                  <h2 className="mt-2 text-2xl font-semibold text-foreground">Trial Balance</h2>
                   <p className="mt-1 text-sm text-foreground-muted">
                     From {formatDate(trialBalance.dateFrom)} to {formatDate(trialBalance.dateTo)}
                   </p>
@@ -326,9 +326,11 @@ export function TrialBalancePageClient(): JSX.Element {
                 <table className="w-full border-collapse text-sm">
                   <thead>
                     <tr className="border-y border-border bg-muted text-meta text-foreground-muted">
-                      <th className="px-3 py-3 sm:px-6 text-left font-bold">Account</th>
-                      <th className="w-20 px-2 py-3 text-right font-bold sm:w-40 sm:px-6">Debit</th>
-                      <th className="w-20 px-2 py-3 text-right font-bold sm:w-40 sm:px-6">
+                      <th className="px-3 py-3 sm:px-6 text-left font-semibold">Account</th>
+                      <th className="w-20 px-2 py-3 text-right font-semibold sm:w-40 sm:px-6">
+                        Debit
+                      </th>
+                      <th className="w-20 px-2 py-3 text-right font-semibold sm:w-40 sm:px-6">
                         Credit
                       </th>
                     </tr>
@@ -337,7 +339,7 @@ export function TrialBalancePageClient(): JSX.Element {
                     {sections.map((section) => (
                       <Fragment key={section.type}>
                         <tr className="border-b border-border">
-                          <td className="px-3 py-3 sm:px-6 text-base font-bold text-foreground">
+                          <td className="px-3 py-3 sm:px-6 text-base font-semibold text-foreground">
                             {section.label}
                           </td>
                           <td />
@@ -366,7 +368,7 @@ export function TrialBalancePageClient(): JSX.Element {
                               </tr>
                             ))}
                             <tr className="border-b border-border">
-                              <td className="pl-6 pr-3 py-3 sm:px-10 font-bold text-foreground">
+                              <td className="pl-6 pr-3 py-3 sm:px-10 font-semibold text-foreground">
                                 Total for {formatGroupName(group.group)}
                               </td>
                               <AmountCell value={group.closingDebit} />
@@ -376,7 +378,7 @@ export function TrialBalancePageClient(): JSX.Element {
                         ))}
                       </Fragment>
                     ))}
-                    <tr className="border-t border-border text-base font-bold text-foreground">
+                    <tr className="border-t border-border text-base font-semibold text-foreground">
                       <td className="px-6 py-4">Total for Trial Balance</td>
                       <td className="px-6 py-4 text-right tabular-nums">
                         {money(trialBalance.totalDebit)}

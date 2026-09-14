@@ -389,7 +389,7 @@ export function GeneralLedgerPageClient(): JSX.Element {
               <Card>
                 <CardContent className="p-4">
                   <p className="text-xs text-brand-mocha">Opening</p>
-                  <p className="mt-1 text-xl font-bold text-brand-espresso">
+                  <p className="mt-1 text-xl font-semibold text-brand-espresso">
                     {money(ledger.openingBalance)}
                   </p>
                 </CardContent>
@@ -398,7 +398,7 @@ export function GeneralLedgerPageClient(): JSX.Element {
             <Card>
               <CardContent className="p-4">
                 <p className="text-xs text-brand-mocha">Debit</p>
-                <p className="mt-1 text-xl font-bold text-brand-espresso">
+                <p className="mt-1 text-xl font-semibold text-brand-espresso">
                   {money(ledger.periodDebit)}
                 </p>
               </CardContent>
@@ -406,7 +406,7 @@ export function GeneralLedgerPageClient(): JSX.Element {
             <Card>
               <CardContent className="p-4">
                 <p className="text-xs text-brand-mocha">Credit</p>
-                <p className="mt-1 text-xl font-bold text-brand-espresso">
+                <p className="mt-1 text-xl font-semibold text-brand-espresso">
                   {money(ledger.periodCredit)}
                 </p>
               </CardContent>
@@ -415,7 +415,7 @@ export function GeneralLedgerPageClient(): JSX.Element {
               <Card>
                 <CardContent className="p-4">
                   <p className="text-xs text-brand-mocha">Closing</p>
-                  <p className="mt-1 text-xl font-bold text-brand-espresso">
+                  <p className="mt-1 text-xl font-semibold text-brand-espresso">
                     {money(ledger.closingBalance)}
                   </p>
                 </CardContent>

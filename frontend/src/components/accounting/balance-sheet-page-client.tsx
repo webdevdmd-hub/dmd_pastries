@@ -140,7 +140,7 @@ function AmountCell({ strong = false, value }: { strong?: boolean; value: number
     <td
       className={cn(
         "w-20 px-2 py-3 sm:w-52 sm:px-6 text-right tabular-nums",
-        strong ? "font-bold text-foreground" : "font-medium text-info-text",
+        strong ? "font-semibold text-foreground" : "font-medium text-info-text",
       )}
     >
       {money(value)}
@@ -160,13 +160,13 @@ function BalanceSheetRows({
   return (
     <>
       <tr className="border-b border-border">
-        <td className="px-3 py-3 sm:px-6 text-base font-bold text-foreground">{title}</td>
+        <td className="px-3 py-3 sm:px-6 text-base font-semibold text-foreground">{title}</td>
         <td />
       </tr>
       {groups.map((group) => (
         <Fragment key={`${title}-${group.group}`}>
           <tr className="border-b border-border">
-            <td className="pl-6 pr-3 py-3 sm:px-10 font-bold text-foreground">{group.group}</td>
+            <td className="pl-6 pr-3 py-3 sm:px-10 font-semibold text-foreground">{group.group}</td>
             <AmountCell value={0} />
           </tr>
           {group.items.map((item, itemIndex) => (
@@ -193,7 +193,7 @@ function BalanceSheetRows({
             </tr>
           ))}
           <tr className="border-b border-border">
-            <td className="pl-6 pr-3 py-3 sm:px-10 font-bold text-foreground">
+            <td className="pl-6 pr-3 py-3 sm:px-10 font-semibold text-foreground">
               Total for {group.group}
             </td>
             <AmountCell strong value={group.amount} />
@@ -201,7 +201,7 @@ function BalanceSheetRows({
         </Fragment>
       ))}
       <tr className="border-b border-border bg-muted/60">
-        <td className="px-3 py-3 sm:px-6 font-bold text-foreground">Total for {title}</td>
+        <td className="px-3 py-3 sm:px-6 font-semibold text-foreground">Total for {title}</td>
         <AmountCell strong value={section.total} />
       </tr>
     </>
@@ -339,7 +339,7 @@ export function BalanceSheetPageClient(): JSX.Element {
               <div className="mx-auto max-w-4xl md:min-w-[42rem]">
                 <div className="mb-8 text-center">
                   <p className="text-sm font-medium text-foreground-muted">Accrual basis</p>
-                  <h2 className="mt-2 text-2xl font-bold text-foreground">Balance Sheet</h2>
+                  <h2 className="mt-2 text-2xl font-semibold text-foreground">Balance Sheet</h2>
                   <p className="mt-1 text-sm text-foreground-muted">
                     As of {formatDate(balanceSheet.asOfDate)}
                   </p>
@@ -375,8 +375,10 @@ export function BalanceSheetPageClient(): JSX.Element {
                 <table className="w-full border-collapse text-sm">
                   <thead>
                     <tr className="border-y border-border bg-muted text-meta text-foreground-muted">
-                      <th className="px-3 py-3 sm:px-6 text-left font-bold">Account</th>
-                      <th className="w-20 px-2 py-3 text-right font-bold sm:w-52 sm:px-6">Total</th>
+                      <th className="px-3 py-3 sm:px-6 text-left font-semibold">Account</th>
+                      <th className="w-20 px-2 py-3 text-right font-semibold sm:w-52 sm:px-6">
+                        Total
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -384,16 +386,16 @@ export function BalanceSheetPageClient(): JSX.Element {
                     <BalanceSheetRows section={balanceSheet.liabilities} title="Liabilities" />
                     <BalanceSheetRows section={balanceSheet.equity} title="Equity" />
                     <tr className="border-t border-border">
-                      <td className="px-6 py-4 font-bold text-foreground">
+                      <td className="px-6 py-4 font-semibold text-foreground">
                         Liabilities and Equity
                       </td>
                       <AmountCell strong value={balanceSheet.totalLiabilitiesAndEquity} />
                     </tr>
                     <tr className="border-t border-border">
-                      <td className="px-6 py-4 font-bold text-foreground">Difference</td>
+                      <td className="px-6 py-4 font-semibold text-foreground">Difference</td>
                       <td
                         className={cn(
-                          "px-6 py-4 text-right font-bold tabular-nums",
+                          "px-6 py-4 text-right font-semibold tabular-nums",
                           balanceSheet.difference === 0 ? "text-foreground" : "text-danger-text",
                         )}
                       >

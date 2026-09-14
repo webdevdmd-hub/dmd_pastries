@@ -42,7 +42,7 @@ export function RefundsTable({ refunds }: RefundsTableProps): JSX.Element {
       <TableBody>
         {refunds.map((refund) => (
           <TableRow key={refund.id}>
-            <TableCell className="whitespace-nowrap font-bold">{refund.refundNumber}</TableCell>
+            <TableCell className="whitespace-nowrap font-semibold">{refund.refundNumber}</TableCell>
             <TableCell className="whitespace-nowrap">{refund.saleNumber}</TableCell>
             <TableCell className="whitespace-nowrap">
               <PaymentMethodBadge methodName={refund.paymentMethodNameSnapshot} />

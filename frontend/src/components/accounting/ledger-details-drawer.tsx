@@ -120,7 +120,7 @@ export function LedgerDetailsDrawer({
               <CardContent className="grid gap-4 p-4 md:grid-cols-[1.4fr_repeat(3,1fr)]">
                 <div>
                   <p className="text-xs text-brand-mocha">Account</p>
-                  <p className="mt-1 font-bold text-brand-espresso">
+                  <p className="mt-1 font-semibold text-brand-espresso">
                     {displayAccount.accountCode} - {displayAccount.accountName}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
@@ -152,7 +152,7 @@ export function LedgerDetailsDrawer({
               <Card>
                 <CardContent className="p-4">
                   <p className="text-xs text-brand-mocha">Opening</p>
-                  <p className="mt-1 text-xl font-bold text-brand-espresso">
+                  <p className="mt-1 text-xl font-semibold text-brand-espresso">
                     {money(ledger?.summary.openingBalance ?? 0)}
                   </p>
                 </CardContent>
@@ -160,7 +160,7 @@ export function LedgerDetailsDrawer({
               <Card>
                 <CardContent className="p-4">
                   <p className="text-xs text-brand-mocha">Debit</p>
-                  <p className="mt-1 text-xl font-bold text-brand-espresso">
+                  <p className="mt-1 text-xl font-semibold text-brand-espresso">
                     {money(ledger?.summary.periodDebit ?? 0)}
                   </p>
                 </CardContent>
@@ -168,7 +168,7 @@ export function LedgerDetailsDrawer({
               <Card>
                 <CardContent className="p-4">
                   <p className="text-xs text-brand-mocha">Credit</p>
-                  <p className="mt-1 text-xl font-bold text-brand-espresso">
+                  <p className="mt-1 text-xl font-semibold text-brand-espresso">
                     {money(ledger?.summary.periodCredit ?? 0)}
                   </p>
                 </CardContent>
@@ -176,7 +176,7 @@ export function LedgerDetailsDrawer({
               <Card>
                 <CardContent className="p-4">
                   <p className="text-xs text-brand-mocha">Closing</p>
-                  <p className="mt-1 text-xl font-bold text-brand-espresso">
+                  <p className="mt-1 text-xl font-semibold text-brand-espresso">
                     {money(ledger?.summary.closingBalance ?? 0)}{" "}
                     <span className="text-sm text-brand-mocha">{ledger?.summary.balanceLabel}</span>
                   </p>

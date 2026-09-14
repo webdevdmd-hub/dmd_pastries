@@ -141,7 +141,7 @@ function ReceiptMockPreview({ layout }: { layout: ReceiptLayoutSchema }): JSX.El
           </div>
         ) : null}
         {layout.layoutConfig.showBusinessName ? (
-          <p className="font-bold">Golden Crust Bakery</p>
+          <p className="font-semibold">Golden Crust Bakery</p>
         ) : null}
         {layout.layoutConfig.showBranchName ? <p>Main Branch</p> : null}
         {layout.layoutConfig.showAddress ? <p>Business address line</p> : null}

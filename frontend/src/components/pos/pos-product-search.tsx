@@ -19,7 +19,7 @@ export function POSProductSearch({ onChange, value }: POSProductSearchProps): JS
         placeholder="Search"
         value={value}
       />
-      <span className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded border border-border bg-muted px-2 py-1 font-mono text-[0.62rem] font-bold uppercase text-foreground-muted 2xl:inline-flex">
+      <span className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded border border-border bg-muted px-2 py-1 font-mono text-xs font-medium text-foreground-muted 2xl:inline-flex">
         CMD + K
       </span>
     </label>

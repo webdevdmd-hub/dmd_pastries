@@ -16,7 +16,7 @@ export function BatchTimeline({ batch }: { batch: ProductionBatch }): JSX.Elemen
 
   return (
     <section className="rounded-2xl border border-border bg-card p-6">
-      <h2 className="text-sm font-bold text-foreground">Production Timeline</h2>
+      <h2 className="text-sm font-semibold text-foreground">Production Timeline</h2>
       <div className="mt-6 space-y-0">
         {steps.map((step, index) => (
           <div className="grid grid-cols-[24px_1fr] gap-4" key={step.label}>

@@ -57,7 +57,7 @@ export function ReconciliationTable({ reconciliations }: ReconciliationTableProp
       <TableBody>
         {reconciliations.map((reconciliation) => (
           <TableRow key={reconciliation.id}>
-            <TableCell className="whitespace-nowrap font-bold">
+            <TableCell className="whitespace-nowrap font-semibold">
               {formatDate(reconciliation.reconciliationDate)}
             </TableCell>
             <TableCell className="whitespace-nowrap">{reconciliation.branchName}</TableCell>
