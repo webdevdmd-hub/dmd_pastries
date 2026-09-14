@@ -692,8 +692,18 @@ export function POSWorkspace(): JSX.Element {
         clearCheckoutFeedback();
         const maxQuantity = stockByCartItemId.get(cartItemId);
         if (maxQuantity !== undefined && quantity > maxQuantity) {
+          // Name the item. A toast in the corner of a busy register does not
+          // say which line it belongs to, and a cart with several items gives
+          // "Only 4 in stock." no referent. The add-to-cart path on the same
+          // condition already names the product; these two now read alike.
+          const cappedItem = cart.items.find((item) => item.cartItemId === cartItemId);
+          const cappedName = cappedItem
+            ? [cappedItem.productName, cappedItem.variantName].filter(Boolean).join(" ")
+            : null;
           toast.warning(
-            `Only ${maxQuantity.toLocaleString(undefined, { maximumFractionDigits: 3 })} in stock.`,
+            cappedName
+              ? `Only ${maxQuantity.toLocaleString(undefined, { maximumFractionDigits: 3 })} of ${cappedName} in stock.`
+              : `Only ${maxQuantity.toLocaleString(undefined, { maximumFractionDigits: 3 })} in stock.`,
           );
           cart.updateQuantity(cartItemId, maxQuantity);
           return;
