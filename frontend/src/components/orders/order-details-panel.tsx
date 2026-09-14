@@ -28,6 +28,7 @@ import {
 import { ROUTES } from "@/constants/routes";
 import { useUpdateOrderStatus } from "@/hooks/use-orders";
 import { getErrorMessage } from "@/lib/api/client";
+import { allowedOrderTransitions } from "@/lib/orders/status-rules";
 import { formatDateOnly } from "@/lib/utils/date-only";
 import type { BakeryOrder, OrderStatus } from "@/types/orders";
 
@@ -45,15 +46,6 @@ type OrderDetailsPanelProps = {
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" }).format(value);
 }
-
-const transitions: OrderStatus[] = [
-  "confirmed",
-  "in_production",
-  "ready",
-  "delivered",
-  "completed",
-  "cancelled",
-];
 
 /**
  * The body of an order's details: summary, status buttons, the tab strip and
@@ -130,10 +122,18 @@ export function OrderDetailsPanel({
               ) : null}
             </div>
           </div>
+          {/* This row used to be a flat list of all six statuses with only the
+              current one disabled, so every order offered five buttons and the
+              server refused most of them: a cancelled order offered five that
+              all failed with "invalid order status transition". The shared
+              rules answer with the transitions the server actually accepts.
+
+              Regression: ISSUE-004 — order status buttons offered transitions the server refuses
+              Found by /qa on 2026-09-14 */}
           <div className="mt-5 flex flex-wrap gap-2">
-            {transitions.map((status) => (
+            {allowedOrderTransitions(order.orderStatus).map((status) => (
               <Button
-                disabled={!canManage || order.orderStatus === status || statusMutation.isPending}
+                disabled={!canManage || statusMutation.isPending}
                 className={
                   status === "cancelled"
                     ? "border-danger/30 text-danger-text hover:bg-danger-tint"
@@ -154,6 +154,15 @@ export function OrderDetailsPanel({
                 {status.replace("_", " ")}
               </Button>
             ))}
+            {/* Cancelled is the only status with nowhere left to go, so the
+                row would otherwise be a bare strip of whitespace with no
+                explanation for the buttons that used to sit there. A completed
+                order still offers cancel, which restocks and reverses. */}
+            {allowedOrderTransitions(order.orderStatus).length === 0 ? (
+              <p className="text-cell text-brand-mocha">
+                This order is cancelled and cannot be reopened.
+              </p>
+            ) : null}
           </div>
         </section>
 
@@ -192,8 +201,11 @@ export function OrderDetailsPanel({
           <DialogHeader>
             <DialogTitle>Cancel {order.orderNumber}?</DialogTitle>
             <DialogDescription>
-              The order leaves every production and pickup list and cannot be reopened. Payments
-              already recorded stay on the order for refund handling.
+              {order.orderStatus !== "completed" && order.paidAmount > 0
+                ? "This order is holding AED " +
+                  order.paidAmount.toFixed(2) +
+                  " in advance payments. Refund them, or convert them to store credit, before cancelling. The order leaves every production and pickup list and cannot be reopened."
+                : "The order leaves every production and pickup list and cannot be reopened. Payments already recorded stay on the order for refund handling."}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

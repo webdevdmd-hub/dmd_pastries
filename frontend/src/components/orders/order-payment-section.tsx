@@ -14,6 +14,7 @@ import { useAddOrderPayment, useOrderPayments, useRefundOrderPayment } from "@/h
 import { usePaymentMethods } from "@/hooks/use-payments";
 import { getErrorMessage } from "@/lib/api/client";
 import { orderPaymentTypeLabel } from "@/lib/orders/payment-stage";
+import { canAddOrderPayment } from "@/lib/orders/status-rules";
 import type { BakeryOrder } from "@/types/orders";
 
 function formatCurrency(value: number): string {
@@ -40,8 +41,18 @@ export function OrderPaymentSection({
       ? Math.max(order.paidAmount - order.refundedAmount, 0)
       : Math.max(order.paidAmount, 0)
     : 0;
+  // Store credit is listed as a bakery-order method in settings but AddPayment
+  // refuses it outright: "store credit can only be redeemed at POS checkout",
+  // because bakery payments have no subledger decrement pipeline (W4). Offering
+  // it here only produced a tender that always failed on submit.
+  //
+  // Regression: ISSUE-006 — bakery order payments offered a store-credit tender the server refuses
+  // Found by /qa on 2026-09-14
   const visiblePaymentMethods = (methodsQuery.data ?? []).filter(
-    (method) => method.status === "active" && method.showInBakeryOrders,
+    (method) =>
+      method.status === "active" &&
+      method.showInBakeryOrders &&
+      method.methodType !== "store_credit",
   );
   const usablePaymentMethods = visiblePaymentMethods.filter((method) =>
     Boolean(method.defaultPaymentAccountId),
@@ -67,7 +78,12 @@ export function OrderPaymentSection({
             Refund
           </Button>
           <Button
-            disabled={!order || !canManage || order.balanceAmount <= 0}
+            disabled={
+              !order ||
+              !canManage ||
+              order.balanceAmount <= 0 ||
+              !canAddOrderPayment(order.orderStatus)
+            }
             onClick={() => setOpen(true)}
             type="button"
             variant="outline"
