@@ -64,8 +64,23 @@ export function POSProductGrid({
     );
   }
 
+  // Intrinsic columns, not breakpoints. The old sm/lg/xl column counts keyed
+  // off the VIEWPORT, but this grid lives in the middle track of
+  // `[144px_minmax(0,1fr)_480px]`, so the rail and the cart take 624px before it
+  // gets anything. On a 1024x768 counter tablet -- the common iPad landscape
+  // till -- that left 400px, and `lg:grid-cols-4` cut it into 82.8px tiles whose
+  // product-name element collapsed to a 2px clientWidth. 1280 was no better:
+  // 575px across `xl:grid-cols-5` gave 105px tiles.
+  //
+  // auto-fill with a minimum tile width fits as many columns as the column
+  // ACTUALLY has, and never goes below a legible tile, at any width -- with no
+  // container-query plugin (none is installed) and no breakpoint to keep in sync
+  // with the shell. Measured after: ~177px at 1024, ~184px at 1280.
+  //
+  // Regression: ISSUE-002 — register tiles collapsed on a counter tablet
+  // Found by /qa on 2026-09-14
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] gap-3">
       {products.map((product) => (
         <POSProductCard
           key={product.id}
