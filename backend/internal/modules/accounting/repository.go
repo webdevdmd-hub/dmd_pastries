@@ -814,6 +814,43 @@ func (r *Repository) SumStockMovementCostByReference(tx *gorm.DB, businessID, re
 	return total, err
 }
 
+// SumBakeryOrderUncostedItemCost prices the catalog items on a bakery order
+// that relieved no stock at all.
+//
+// Cost of sales is normally summed from the stock movements an order made, so
+// an item that moved nothing contributes nothing. That is right for a custom
+// cake, which was never coming off a shelf. It is wrong for a stock-tracked
+// catalog product with no inventory item on the order's branch: consumption
+// skips it, cost comes out zero, and revenue posts with no cost against it.
+//
+// This returns quantity x cost_price for exactly those items -- product-backed,
+// stock-tracked, and with no inventory item to relieve -- so the COGS journal
+// can fall back to the product's own cost instead of dropping the cost.
+// Custom items (no product_id) and untracked products are excluded, because
+// they are the cases that legitimately cost nothing.
+//
+// Regression: ISSUE-007 — a completed order posted revenue with no cost of sales
+// Found by /qa on 2026-09-14
+func (r *Repository) SumBakeryOrderUncostedItemCost(tx *gorm.DB, businessID, orderID, branchID string) (float64, error) {
+	var total float64
+	err := tx.Table("bakery_order_items boi").
+		Select("COALESCE(SUM(boi.quantity * COALESCE(p.cost_price, 0)), 0)").
+		Joins("JOIN products p ON p.id = boi.product_id AND p.business_id = boi.business_id AND p.deleted_at IS NULL").
+		Joins(`LEFT JOIN inventory_items ii
+			ON ii.business_id = p.business_id
+			AND ii.branch_id = ?
+			AND ii.product_id = p.id
+			AND ii.deleted_at IS NULL
+			AND (
+				(boi.product_variant_id IS NULL AND ii.product_variant_id IS NULL AND ii.item_type = 'product')
+				OR (boi.product_variant_id IS NOT NULL AND ii.product_variant_id = boi.product_variant_id AND ii.item_type = 'product_variant')
+			)`, branchID).
+		Where("boi.business_id = ? AND boi.bakery_order_id = ? AND boi.deleted_at IS NULL", businessID, orderID).
+		Where("boi.product_id IS NOT NULL AND p.is_stock_tracked = TRUE AND ii.id IS NULL").
+		Scan(&total).Error
+	return total, err
+}
+
 func (r *Repository) SumStockMovementCostByReferenceAndType(tx *gorm.DB, businessID, referenceType, referenceID, movementType string) (float64, error) {
 	var total float64
 	err := tx.Table("stock_movements").
