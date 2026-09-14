@@ -777,7 +777,7 @@ func (s *Service) AuthenticateToken(token string) (*utils.AuthContext, error) {
 	// inactive user does just above. Platform admins never reach this code --
 	// they return earlier -- so closing a business cannot lock out the people
 	// who need to reopen it.
-	business, err := s.businessRepo.FindByID(user.BusinessID)
+	business, err := s.businessRepo.FindByIDTx(tx, user.BusinessID)
 	if err != nil {
 		tx.Rollback()
 		return nil, apperrors.Internal("failed to load workspace")
@@ -856,7 +856,7 @@ func (s *Service) syncProfile(identity *utils.AppwriteIdentity, ipAddress, userA
 	// inactive user does just above. Platform admins never reach this code --
 	// they return earlier -- so closing a business cannot lock out the people
 	// who need to reopen it.
-	business, err := s.businessRepo.FindByID(user.BusinessID)
+	business, err := s.businessRepo.FindByIDTx(tx, user.BusinessID)
 	if err != nil {
 		tx.Rollback()
 		return nil, apperrors.Internal("failed to load workspace")
