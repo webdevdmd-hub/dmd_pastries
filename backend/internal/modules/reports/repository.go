@@ -699,12 +699,20 @@ func (r *Repository) DailySalesReport(filter *shared.ResolvedFilter) ([]DailySal
 			WHERE 1 = 1%s
 			GROUP BY ss.bucket
 		)
+		-- discount_total is the sale header alone. It is NOT the header plus the
+		-- line sum: a sale-level discount is allocated into the lines at
+		-- checkout and the header is then the sum of those lines, so adding
+		-- them reports every discount twice. This query fed the Sales overview
+		-- "Discount Total", which read 702.00 against a single 351.00 discount.
+		--
+		-- Regression: ISSUE-013 — the discount report counted every discount twice
+		-- Found by /qa on 2026-09-14
 		SELECT ss.bucket AS bucket,
 			COALESCE(SUM(ss.subtotal_amount),0) AS gross_sales,
 			COALESCE(SUM(ss.total_amount),0) AS net_sales,
 			COUNT(*) FILTER (WHERE %s) AS sales_count,
 			COALESCE(MAX(lt.items_sold),0) AS items_sold,
-			COALESCE(SUM(ss.discount_amount),0) + COALESCE(MAX(lt.line_discount),0) AS discount_total,
+			COALESCE(SUM(ss.discount_amount),0) AS discount_total,
 			COALESCE(SUM(ss.tax_amount),0) AS tax_total
 		FROM scoped_sales ss
 		LEFT JOIN line_totals lt ON lt.bucket = ss.bucket`,
