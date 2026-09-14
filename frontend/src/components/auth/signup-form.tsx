@@ -203,17 +203,17 @@ export function SignupForm(): JSX.Element {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className={labelClassName}>Full name</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <UserRound className={iconClassName} />
+                    <div className="relative">
+                      <UserRound className={iconClassName} />
+                      <FormControl>
                         <Input
                           autoComplete="name"
                           className={inputClassName}
                           placeholder="Mina Hassan"
                           {...field}
                         />
-                      </div>
-                    </FormControl>
+                      </FormControl>
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -224,16 +224,16 @@ export function SignupForm(): JSX.Element {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className={labelClassName}>Business name</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Building2 className={iconClassName} />
+                    <div className="relative">
+                      <Building2 className={iconClassName} />
+                      <FormControl>
                         <Input
                           className={inputClassName}
                           placeholder="Golden Crust Bakery"
                           {...field}
                         />
-                      </div>
-                    </FormControl>
+                      </FormControl>
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -247,9 +247,9 @@ export function SignupForm(): JSX.Element {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className={labelClassName}>Email</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Mail className={iconClassName} />
+                    <div className="relative">
+                      <Mail className={iconClassName} />
+                      <FormControl>
                         <Input
                           autoComplete="email"
                           className={inputClassName}
@@ -257,8 +257,8 @@ export function SignupForm(): JSX.Element {
                           type="email"
                           {...field}
                         />
-                      </div>
-                    </FormControl>
+                      </FormControl>
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -269,9 +269,9 @@ export function SignupForm(): JSX.Element {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className={labelClassName}>Phone</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Phone className={iconClassName} />
+                    <div className="relative">
+                      <Phone className={iconClassName} />
+                      <FormControl>
                         <Input
                           autoComplete="tel"
                           className={inputClassName}
@@ -279,8 +279,8 @@ export function SignupForm(): JSX.Element {
                           type="tel"
                           {...field}
                         />
-                      </div>
-                    </FormControl>
+                      </FormControl>
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -294,9 +294,9 @@ export function SignupForm(): JSX.Element {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className={labelClassName}>Password</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <LockKeyhole className={iconClassName} />
+                    <div className="relative">
+                      <LockKeyhole className={iconClassName} />
+                      <FormControl>
                         <Input
                           autoComplete="new-password"
                           className={`${inputClassName} pr-11`}
@@ -304,24 +304,24 @@ export function SignupForm(): JSX.Element {
                           type={showPassword ? "text" : "password"}
                           {...field}
                         />
-                        <button
-                          aria-label={showPassword ? "Hide password" : "Show password"}
-                          aria-pressed={showPassword}
-                          className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-foreground-muted transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20"
-                          onClick={() => {
-                            setShowPassword((current) => !current);
-                          }}
-                          title={showPassword ? "Hide password" : "Show password"}
-                          type="button"
-                        >
-                          {showPassword ? (
-                            <EyeOff className="h-4 w-4" />
-                          ) : (
-                            <Eye className="h-4 w-4" />
-                          )}
-                        </button>
-                      </div>
-                    </FormControl>
+                      </FormControl>
+                      <button
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                        aria-pressed={showPassword}
+                        className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-foreground-muted transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20"
+                        onClick={() => {
+                          setShowPassword((current) => !current);
+                        }}
+                        title={showPassword ? "Hide password" : "Show password"}
+                        type="button"
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -332,9 +332,9 @@ export function SignupForm(): JSX.Element {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className={labelClassName}>Confirm password</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <LockKeyhole className={iconClassName} />
+                    <div className="relative">
+                      <LockKeyhole className={iconClassName} />
+                      <FormControl>
                         <Input
                           autoComplete="new-password"
                           className={`${inputClassName} pr-11`}
@@ -342,28 +342,28 @@ export function SignupForm(): JSX.Element {
                           type={showConfirmPassword ? "text" : "password"}
                           {...field}
                         />
-                        <button
-                          aria-label={
-                            showConfirmPassword ? "Hide confirm password" : "Show confirm password"
-                          }
-                          aria-pressed={showConfirmPassword}
-                          className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-foreground-muted transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20"
-                          onClick={() => {
-                            setShowConfirmPassword((current) => !current);
-                          }}
-                          title={
-                            showConfirmPassword ? "Hide confirm password" : "Show confirm password"
-                          }
-                          type="button"
-                        >
-                          {showConfirmPassword ? (
-                            <EyeOff className="h-4 w-4" />
-                          ) : (
-                            <Eye className="h-4 w-4" />
-                          )}
-                        </button>
-                      </div>
-                    </FormControl>
+                      </FormControl>
+                      <button
+                        aria-label={
+                          showConfirmPassword ? "Hide confirm password" : "Show confirm password"
+                        }
+                        aria-pressed={showConfirmPassword}
+                        className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-foreground-muted transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20"
+                        onClick={() => {
+                          setShowConfirmPassword((current) => !current);
+                        }}
+                        title={
+                          showConfirmPassword ? "Hide confirm password" : "Show confirm password"
+                        }
+                        type="button"
+                      >
+                        {showConfirmPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}

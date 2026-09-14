@@ -481,20 +481,20 @@ function CompanySettingsDialog({
               render={({ field }) => (
                 <FormItem className="md:col-span-2">
                   <FormLabel>Company logo</FormLabel>
-                  <FormControl>
-                    <div className="flex flex-col gap-3 rounded-2xl border border-brand-cappuccino bg-brand-latte/50 p-3 sm:flex-row sm:items-center">
-                      {previewUrl ? (
-                        <img
-                          alt="Selected company logo"
-                          className="h-20 w-20 rounded-xl object-cover"
-                          src={previewUrl}
-                        />
-                      ) : (
-                        <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-brand-cappuccino/50 text-center text-xs text-brand-mocha">
-                          No logo
-                        </div>
-                      )}
-                      <div className="grid flex-1 gap-2">
+                  <div className="flex flex-col gap-3 rounded-2xl border border-brand-cappuccino bg-brand-latte/50 p-3 sm:flex-row sm:items-center">
+                    {previewUrl ? (
+                      <img
+                        alt="Selected company logo"
+                        className="h-20 w-20 rounded-xl object-cover"
+                        src={previewUrl}
+                      />
+                    ) : (
+                      <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-brand-cappuccino/50 text-center text-xs text-brand-mocha">
+                        No logo
+                      </div>
+                    )}
+                    <div className="grid flex-1 gap-2">
+                      <FormControl>
                         <Input
                           accept="image/jpeg,image/png,image/webp"
                           onChange={(event) => {
@@ -503,13 +503,13 @@ function CompanySettingsDialog({
                           }}
                           type="file"
                         />
-                        <input type="hidden" {...field} />
-                        <p className="text-xs leading-5 text-brand-mocha">
-                          Your logo appears on receipts, invoices and printed reports.
-                        </p>
-                      </div>
+                      </FormControl>
+                      <input type="hidden" {...field} />
+                      <p className="text-xs leading-5 text-brand-mocha">
+                        Your logo appears on receipts, invoices and printed reports.
+                      </p>
                     </div>
-                  </FormControl>
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
