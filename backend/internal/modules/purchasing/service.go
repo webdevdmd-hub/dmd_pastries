@@ -154,7 +154,7 @@ func (s *Service) UpdateOrder(currentUser *utils.AuthContext, id string, req Upd
 		if err != nil {
 			return err
 		}
-		if err := s.validateHeader(tx, currentUser.BusinessID, branchID, supplierID); err != nil {
+		if _, err := s.validateHeader(tx, currentUser.BusinessID, branchID, supplierID, supplierUseNewDocument); err != nil {
 			return err
 		}
 		updates := map[string]interface{}{"branch_id": branchID, "supplier_id": supplierID, "order_date": parsedOrderDate, "expected_delivery_date": parsedExpected, "notes": strings.TrimSpace(req.Notes), "updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}
@@ -482,7 +482,7 @@ func (s *Service) applyDirectOrderRevisionUpdate(tx *gorm.DB, currentUser *utils
 	if err != nil {
 		return err
 	}
-	if err := s.validateHeader(tx, currentUser.BusinessID, branchID, supplierID); err != nil {
+	if _, err := s.validateHeader(tx, currentUser.BusinessID, branchID, supplierID, supplierUseNewDocument); err != nil {
 		return err
 	}
 	updates := map[string]interface{}{"branch_id": branchID, "supplier_id": supplierID, "order_date": parsedOrderDate, "expected_delivery_date": parsedExpected, "notes": strings.TrimSpace(req.Notes), "updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}
@@ -1165,8 +1165,8 @@ func (s *Service) createSupplierPayment(currentUser *utils.AuthContext, req Crea
 	amount := roundMoney(req.Amount)
 	var paymentID string
 	err = s.db.Transaction(func(tx *gorm.DB) error {
-		if err := s.repo.ValidateSupplier(tx, currentUser.BusinessID, branchID, req.SupplierID); err != nil {
-			return notFound(err, "supplier not found")
+		if _, err := s.requireSupplier(tx, currentUser.BusinessID, branchID, req.SupplierID, supplierPaymentUse(req)); err != nil {
+			return err
 		}
 		method, err := s.repo.PaymentMethod(tx, currentUser.BusinessID, req.PaymentMethodID)
 		if err != nil {
@@ -1331,8 +1331,8 @@ func (s *Service) UpdateSupplierPayment(currentUser *utils.AuthContext, id strin
 		if err := s.rollbackSupplierPaymentImpact(tx, currentUser, existing); err != nil {
 			return err
 		}
-		if err := s.repo.ValidateSupplier(tx, currentUser.BusinessID, branchID, req.SupplierID); err != nil {
-			return notFound(err, "supplier not found")
+		if _, err := s.requireSupplier(tx, currentUser.BusinessID, branchID, req.SupplierID, supplierPaymentUse(req)); err != nil {
+			return err
 		}
 		method, err := s.repo.PaymentMethod(tx, currentUser.BusinessID, req.PaymentMethodID)
 		if err != nil {
@@ -2707,8 +2707,9 @@ func (s *Service) SupplierHistory(currentUser *utils.AuthContext, supplierID str
 	branchFilter := ""
 	if !allBranches {
 		branchFilter = branchID
-		if err := s.repo.ValidateSupplier(s.db, currentUser.BusinessID, branchFilter, supplierID); err != nil {
-			return nil, notFound(err, "supplier not found")
+		// "Deactivate — History stays." History is readable at any status.
+		if _, err := s.requireSupplier(s.db, currentUser.BusinessID, branchFilter, supplierID, supplierUseView); err != nil {
+			return nil, err
 		}
 	}
 	orders, _, _ := s.repo.ListOrders(currentUser.BusinessID, ListQuery{BranchID: branchFilter, SupplierID: supplierID, Page: 1, Limit: 50, SortBy: "order_date", SortOrder: "desc"})
@@ -2750,7 +2751,7 @@ func (s *Service) buildOrder(tx *gorm.DB, currentUser *utils.AuthContext, id, br
 		return nil, nil, nil, err
 	}
 	branchID = resolvedBranchID
-	if err := s.validateHeader(tx, currentUser.BusinessID, branchID, supplierID); err != nil {
+	if _, err := s.validateHeader(tx, currentUser.BusinessID, branchID, supplierID, supplierUseNewDocument); err != nil {
 		return nil, nil, nil, err
 	}
 	parsedOrderDate, err := parseDate(orderDate, "order_date")
@@ -2846,7 +2847,14 @@ func (s *Service) buildInvoice(tx *gorm.DB, currentUser *utils.AuthContext, id s
 		return nil, nil, nil, err
 	}
 	req.BranchID = resolvedBranchID
-	if err := s.validateHeader(tx, currentUser.BusinessID, req.BranchID, req.SupplierID); err != nil {
+	// Billing goods already ordered is settling what is open, which the
+	// deactivate dialog allows; a bill with no order is a new document.
+	invoiceUse := supplierUseNewDocument
+	if strings.TrimSpace(req.PurchaseOrderID) != "" {
+		invoiceUse = supplierUseOpenDocument
+	}
+	supplier, err := s.validateHeader(tx, currentUser.BusinessID, req.BranchID, req.SupplierID, invoiceUse)
+	if err != nil {
 		return nil, nil, nil, err
 	}
 	if strings.TrimSpace(req.InvoiceNumber) == "" {
@@ -2859,6 +2867,10 @@ func (s *Service) buildInvoice(tx *gorm.DB, currentUser *utils.AuthContext, id s
 	dueDate, err := parseOptionalDate(req.DueDate, "due_date")
 	if err != nil {
 		return nil, nil, nil, err
+	}
+	// An explicit due date always wins; terms only fill the gap.
+	if dueDate == nil {
+		dueDate = dueDateFromTerms(invoiceDate, supplier.PaymentTerms)
 	}
 	if req.PurchaseOrderID != "" {
 		order, err := s.repo.FindOrder(req.PurchaseOrderID, currentUser.BusinessID)
@@ -2987,7 +2999,12 @@ func (s *Service) buildReceipt(tx *gorm.DB, currentUser *utils.AuthContext, req 
 		return nil, nil, nil, err
 	}
 	req.BranchID = resolvedBranchID
-	if err := s.validateHeader(tx, currentUser.BusinessID, req.BranchID, req.SupplierID); err != nil {
+	// Receiving against an existing order is "receiving what is already open".
+	receiptUse := supplierUseNewDocument
+	if strings.TrimSpace(req.PurchaseOrderID) != "" {
+		receiptUse = supplierUseOpenDocument
+	}
+	if _, err := s.validateHeader(tx, currentUser.BusinessID, req.BranchID, req.SupplierID, receiptUse); err != nil {
 		return nil, nil, nil, err
 	}
 	receivedDate, err := parseDate(req.ReceivedDate, "received_date")
@@ -3331,20 +3348,129 @@ func (s *Service) applyReceiptStock(tx *gorm.DB, currentUser *utils.AuthContext,
 	return nil
 }
 
-func (s *Service) validateHeader(tx *gorm.DB, businessID, branchID, supplierID string) error {
+// supplierUse is what purchasing is about to do for a supplier. Each supplier
+// status permits some uses and not others.
+type supplierUse string
+
+const (
+	// A new purchase order, or a bill or receipt not tied to an existing order.
+	supplierUseNewDocument supplierUse = "new_document"
+	// Receiving or billing against a purchase order that already exists.
+	supplierUseOpenDocument supplierUse = "open_document"
+	// Paying, or amending a payment against, a bill that is already posted.
+	supplierUsePayment supplierUse = "payment"
+	// Reading the supplier's purchase history.
+	supplierUseView supplierUse = "view"
+)
+
+// supplierAllows is the capability table the supplier status dialogs promise,
+// in their own words:
+//
+//	Deactivate  "New purchase orders: not allowed.
+//	             Receiving and paying what is already open: allowed."
+//	Block       "New purchase orders: not allowed. New bills: not allowed.
+//	             Paying bills that are already posted: allowed."
+//
+// Every purchasing action used to require status = active, so deactivating or
+// blocking a supplier made their posted bills unpayable. Measured on 2026-09-15:
+// paying QAF-INV-1001 for the deactivated QA Flour Co returned 404 "supplier
+// not found" -- for a supplier whose name was printed on the bill.
+//
+// Only what the dialogs state is encoded. Receiving from a BLOCKED supplier is
+// not mentioned by the block dialog, so it stays refused: a quality or
+// compliance hold is exactly when goods should not be booked in.
+//
+// Regression: ISSUE-021 — deactivated and blocked suppliers' posted bills could not be paid
+// Found by /qa on 2026-09-15
+func supplierAllows(status string, use supplierUse) bool {
+	switch use {
+	case supplierUseView, supplierUsePayment:
+		return status == "active" || status == "inactive" || status == "blocked"
+	case supplierUseOpenDocument:
+		return status == "active" || status == "inactive"
+	default:
+		return status == "active"
+	}
+}
+
+// requireSupplier loads the supplier and refuses the use its status does not
+// allow, saying WHY -- "supplier not found" for a supplier that plainly exists
+// sent the operator looking for a record that was never missing.
+func (s *Service) requireSupplier(tx *gorm.DB, businessID, branchID, supplierID string, use supplierUse) (*purchasingSupplier, error) {
+	supplier, err := s.repo.PurchasingSupplier(tx, businessID, branchID, supplierID)
+	if err != nil {
+		return nil, notFound(err, "supplier not found")
+	}
+	if supplierAllows(supplier.Status, use) {
+		return supplier, nil
+	}
+	switch supplier.Status {
+	case "blocked":
+		return nil, apperrors.BadRequest("this supplier is blocked; unblock it before raising or receiving purchase documents", map[string]interface{}{"supplier_status": supplier.Status})
+	case "inactive":
+		return nil, apperrors.BadRequest("this supplier is inactive; reactivate it before raising new purchase documents", map[string]interface{}{"supplier_status": supplier.Status})
+	default:
+		return nil, apperrors.BadRequest("this supplier cannot be used for purchasing", map[string]interface{}{"supplier_status": supplier.Status})
+	}
+}
+
+// dueDateFromTerms applies a supplier's payment terms to a bill date.
+//
+// The supplier form says payment terms "Sets the due date on bills from this
+// supplier." Nothing in purchasing read them: a Net 30 supplier's bill posted
+// as "Due Not recorded" on 2026-09-15, so it could never be overdue, and
+// payables ageing had nothing to age. payment_terms was referenced only by the
+// suppliers module itself.
+//
+// Prepaid is due on the bill date. No terms means no due date, as before.
+//
+// Regression: ISSUE-022 — supplier payment terms never set a bill's due date
+// Found by /qa on 2026-09-15
+// supplierPaymentUse decides whether a supplier payment is paying bills that
+// are already posted, or putting new money out.
+//
+// Only a payment fully allocated to bills counts as the former. An advance, or
+// any unallocated remainder, is new money to a supplier and needs an active
+// one: the dialogs allow paying what is already OPEN, not opening a balance.
+func supplierPaymentUse(req CreateSupplierPaymentRequest) supplierUse {
+	if len(req.Allocations) == 0 {
+		return supplierUseNewDocument
+	}
+	allocated := 0.0
+	for _, allocation := range req.Allocations {
+		allocated += allocation.Amount
+	}
+	if roundMoney(allocated) >= roundMoney(req.Amount) {
+		return supplierUsePayment
+	}
+	return supplierUseNewDocument
+}
+
+func dueDateFromTerms(billDate time.Time, terms string) *time.Time {
+	days := map[string]int{"net_7": 7, "net_15": 15, "net_30": 30, "net_45": 45, "net_60": 60, "net_90": 90}
+	switch {
+	case terms == "prepaid":
+		due := billDate
+		return &due
+	case days[terms] > 0:
+		due := billDate.AddDate(0, 0, days[terms])
+		return &due
+	default:
+		return nil
+	}
+}
+
+func (s *Service) validateHeader(tx *gorm.DB, businessID, branchID, supplierID string, use supplierUse) (*purchasingSupplier, error) {
 	if err := validateUUID(branchID, "branch_id"); err != nil {
-		return err
+		return nil, err
 	}
 	if err := validateUUID(supplierID, "supplier_id"); err != nil {
-		return err
+		return nil, err
 	}
 	if err := s.repo.ValidateBranch(tx, businessID, branchID); err != nil {
-		return notFound(err, "branch not found")
+		return nil, notFound(err, "branch not found")
 	}
-	if err := s.repo.ValidateSupplier(tx, businessID, branchID, supplierID); err != nil {
-		return notFound(err, "supplier not found or inactive")
-	}
-	return nil
+	return s.requireSupplier(tx, businessID, branchID, supplierID, use)
 }
 
 func (s *Service) prepareLine(tx *gorm.DB, businessID, branchID string, input lineInput) (preparedItem, lineTotals, error) {

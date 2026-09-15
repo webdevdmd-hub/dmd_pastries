@@ -1224,8 +1224,26 @@ func (r *Repository) ValidateBranch(tx *gorm.DB, businessID, branchID string) er
 	return exists(tx.Table("branches").Where("id = ? AND business_id = ? AND status = ? AND deleted_at IS NULL", branchID, businessID, "active"))
 }
 
-func (r *Repository) ValidateSupplier(tx *gorm.DB, businessID, branchID, supplierID string) error {
-	return exists(tx.Table("suppliers").Where("id = ? AND business_id = ? AND branch_id = ? AND status = ? AND deleted_at IS NULL", supplierID, businessID, branchID, "active"))
+// purchasingSupplier is what purchasing needs to know about a supplier before
+// acting for it: whether its status allows the action, and the terms that set a
+// bill's due date.
+type purchasingSupplier struct {
+	Status       string
+	PaymentTerms string
+}
+
+// PurchasingSupplier loads a non-deleted supplier of ANY status. Whether that
+// status permits a given action is decided by supplierAllows, not by this
+// query -- the removed ValidateSupplier's "status = active" filter decided it for every
+// action at once, which is how paying an inactive supplier's posted bill came
+// back as "supplier not found".
+func (r *Repository) PurchasingSupplier(tx *gorm.DB, businessID, branchID, supplierID string) (*purchasingSupplier, error) {
+	var row purchasingSupplier
+	err := tx.Table("suppliers").
+		Select("status, payment_terms").
+		Where("id = ? AND business_id = ? AND branch_id = ? AND deleted_at IS NULL", supplierID, businessID, branchID).
+		Take(&row).Error
+	return &row, err
 }
 
 func (r *Repository) ValidateUnit(tx *gorm.DB, businessID, unitID string) error {
