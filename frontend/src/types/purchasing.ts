@@ -1,5 +1,6 @@
 import type { BranchStatus } from "@/types/branch";
 import type { ItemStructure, ProductType } from "@/types/product";
+import type { SupplierStatus } from "@/types/supplier";
 
 export type PurchaseOrderStatus =
   | "draft"
@@ -281,6 +282,8 @@ export type PurchasingSummary = {
 export type PurchasingSupplierOption = {
   id: string;
   supplierName: string;
+  /** Pickers filter on this per use; see lib/purchasing/supplier-use.ts. */
+  status: SupplierStatus;
 };
 
 export type PurchasingProductOption = {

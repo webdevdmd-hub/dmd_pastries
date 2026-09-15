@@ -48,9 +48,11 @@
     "test:font-weight": "node scripts/check-font-weight.mjs",
     "test:order-status-rules": "node scripts/check-order-status-rules.mjs",
     "test:movement-type-labels": "node scripts/check-movement-type-labels.mjs",
+    "test:draft-bill-delete": "node scripts/check-draft-bill-delete.mjs",
     "test:no-stub-placeholders": "node scripts/check-no-stub-placeholders.mjs",
     "test:payment-stage-label": "node scripts/check-payment-stage-label.mjs",
     "test:product-flag-labels": "node scripts/check-product-flag-labels.mjs",
+    "test:purchasing-supplier-use": "node scripts/check-purchasing-supplier-use.mjs",
     "test:zero-total-checkout": "node scripts/check-zero-total-checkout.mjs"
   },
   "lint-staged": {

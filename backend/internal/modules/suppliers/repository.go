@@ -146,7 +146,7 @@ func (r *Repository) List(businessID, branchID string, query SupplierListQuery) 
 func (r *Repository) Lookup(businessID, branchID string, query SupplierLookupQuery) ([]SupplierLookupItem, error) {
 	db := r.db.Table("suppliers s").
 		Select("s.id, s.supplier_code, s.supplier_name, s.phone, s.email, s.status").
-		Where("s.business_id = ? AND s.branch_id = ? AND s.status = ? AND s.deleted_at IS NULL", businessID, branchID, "active")
+		Where("s.business_id = ? AND s.branch_id = ? AND s.status IN ? AND s.deleted_at IS NULL", businessID, branchID, lookupStatuses(query))
 	if query.Search != "" {
 		like := "%" + strings.ToLower(query.Search) + "%"
 		db = db.Where("LOWER(s.supplier_name) LIKE ? OR LOWER(s.supplier_code) LIKE ? OR LOWER(s.phone) LIKE ? OR LOWER(s.email) LIKE ?", like, like, like, like)
@@ -154,6 +154,13 @@ func (r *Repository) Lookup(businessID, branchID string, query SupplierLookupQue
 	var suppliers []SupplierLookupItem
 	err := db.Order("s.supplier_name ASC").Limit(query.Limit).Scan(&suppliers).Error
 	return suppliers, err
+}
+
+func lookupStatuses(query SupplierLookupQuery) []string {
+	if query.IncludeInactive {
+		return []string{"active", "inactive", "blocked"}
+	}
+	return []string{"active"}
 }
 
 func (r *Repository) NextSupplierCode(tx *gorm.DB, businessID, branchID string) (string, error) {

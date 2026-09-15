@@ -48,6 +48,7 @@ import {
 import { usePermission } from "@/hooks/use-permission";
 import { usePurchasingBranches, usePurchasingSuppliers } from "@/hooks/use-purchasing";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
+import { supplierOptionsFor, supplierStatusNote } from "@/lib/purchasing/supplier-use";
 import { isLedgerAllowedForContext, isPaymentAccountForBranch } from "@/lib/selectors/eligibility";
 import { uploadFile } from "@/lib/storage/files";
 import type { AccountingAccountType, ChartAccount, PaymentAccount } from "@/types/accounting";
@@ -197,8 +198,12 @@ function uniqueAccounts(accounts: ChartAccount[]): ChartAccount[] {
   return Array.from(accountMap.values());
 }
 
-function supplierOptions(suppliers: PurchasingSupplierOption[]): SearchableComboboxOption[] {
-  return suppliers.map((supplier) => ({
+function supplierOptions(
+  suppliers: PurchasingSupplierOption[],
+  selectedId: string,
+): SearchableComboboxOption[] {
+  return supplierOptionsFor(suppliers, "new_document", selectedId).map((supplier) => ({
+    description: supplierStatusNote(supplier.status),
     label: supplier.supplierName,
     value: supplier.id,
   }));
@@ -312,7 +317,10 @@ function ExpenseFormDialog({
   );
   const hasNoPaidThroughOptions =
     !isAccountLoading && !accountErrorMessage && paidThroughAccountOptions.length === 0;
-  const supplierComboboxOptions = useMemo(() => supplierOptions(suppliers), [suppliers]);
+  const supplierComboboxOptions = useMemo(
+    () => supplierOptions(suppliers, formState.supplierId),
+    [formState.supplierId, suppliers],
+  );
   const customerComboboxOptions = useMemo(() => customerOptions(knownCustomers), [knownCustomers]);
 
   useEffect(() => {

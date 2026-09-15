@@ -30,7 +30,11 @@ func (h *Handler) ListSuppliers(c *gin.Context) {
 
 func (h *Handler) LookupSuppliers(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
-	result, err := h.service.LookupSuppliers(utils.MustAuthContext(c), SupplierLookupQuery{Search: c.Query("search"), Limit: limit})
+	result, err := h.service.LookupSuppliers(utils.MustAuthContext(c), SupplierLookupQuery{
+		Search:          c.Query("search"),
+		Limit:           limit,
+		IncludeInactive: c.Query("include_inactive") == "true",
+	})
 	if err != nil {
 		handleError(c, err)
 		return

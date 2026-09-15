@@ -5,6 +5,8 @@ import { useMemo } from "react";
 
 import type { SearchableComboboxOption } from "@/components/shared/searchable-combobox";
 import { SearchableCombobox } from "@/components/shared/searchable-combobox";
+import type { SupplierUse } from "@/lib/purchasing/supplier-use";
+import { supplierOptionsFor, supplierStatusNote } from "@/lib/purchasing/supplier-use";
 import type { PurchasingSupplierOption } from "@/types/purchasing";
 
 export function SupplierLookupSelect({
@@ -12,6 +14,7 @@ export function SupplierLookupSelect({
   id,
   onValueChange,
   suppliers,
+  use,
   value,
 }: {
   disabled?: boolean;
@@ -19,16 +22,24 @@ export function SupplierLookupSelect({
   id?: string | undefined;
   onValueChange: (supplierId: string) => void;
   suppliers: PurchasingSupplierOption[];
+  /**
+   * Required, so every picker states what it is for. The list includes
+   * inactive and blocked suppliers; offering them to a new purchase order
+   * invites a refusal, and hiding them from a payment hides a bill the server
+   * will let you pay.
+   */
+  use: SupplierUse;
   value: string;
 }): JSX.Element {
   const supplierOptions = useMemo<SearchableComboboxOption[]>(
     () =>
-      suppliers.map((supplier) => ({
+      supplierOptionsFor(suppliers, use, value).map((supplier) => ({
         value: supplier.id,
         label: supplier.supplierName,
+        description: supplierStatusNote(supplier.status),
         keywords: [supplier.supplierName],
       })),
-    [suppliers],
+    [suppliers, use, value],
   );
 
   return (

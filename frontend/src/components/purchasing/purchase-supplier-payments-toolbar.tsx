@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { supplierFilterLabel } from "@/lib/purchasing/supplier-use";
 import type {
   PurchasingBranchOption,
   PurchasingSupplierOption,
@@ -79,7 +80,7 @@ export function PurchaseSupplierPaymentsToolbar({
             <SelectItem value="all">All suppliers</SelectItem>
             {suppliers.map((supplier) => (
               <SelectItem key={supplier.id} value={supplier.id}>
-                {supplier.supplierName}
+                {supplierFilterLabel(supplier)}
               </SelectItem>
             ))}
           </SelectContent>

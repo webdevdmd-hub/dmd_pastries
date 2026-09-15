@@ -29,6 +29,7 @@ import {
 } from "@/hooks/use-purchasing";
 import { getErrorMessage } from "@/lib/api/client";
 import { PURCHASE_PICKER_PAGE_SIZE } from "@/lib/api/purchasing";
+import { supplierOptionsFor, supplierStatusNote } from "@/lib/purchasing/supplier-use";
 import type { StockLocation } from "@/types/inventory";
 import type {
   PurchasingBranchOption,
@@ -149,7 +150,8 @@ export function PurchaseReturnFromReceiptDialog({
 
   const supplierOptions = useMemo(
     () =>
-      suppliers.map((supplier) => ({
+      supplierOptionsFor(suppliers, "history").map((supplier) => ({
+        description: supplierStatusNote(supplier.status),
         label: supplier.supplierName,
         value: supplier.id,
       })),

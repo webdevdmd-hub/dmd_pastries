@@ -41,6 +41,7 @@ func RegisterRoutes(
 	group.PATCH("/invoices/:id", manage, handler.UpdateInvoice)
 	group.POST("/invoices/:id/post", manage, handler.PostInvoice)
 	group.POST("/invoices/:id/cancel", manage, handler.CancelInvoice)
+	group.DELETE("/invoices/:id", manage, handler.DeleteInvoice)
 	group.POST("/invoices/:id/convert-to-receipt", manage, handler.ConvertInvoiceToReceipt)
 	group.GET("/invoices/:id/payments", view, handler.ListInvoicePaymentsByInvoice)
 	group.POST("/invoices/:id/payments", manage, handler.AddInvoicePayment)

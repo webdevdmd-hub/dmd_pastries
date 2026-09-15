@@ -52,8 +52,8 @@ func (s *Service) LookupSuppliers(currentUser *utils.AuthContext, query Supplier
 	if query.Limit <= 0 {
 		query.Limit = 10
 	}
-	if query.Limit > 20 {
-		query.Limit = 20
+	if query.Limit > supplierLookupMaxLimit {
+		query.Limit = supplierLookupMaxLimit
 	}
 	items, err := s.repo.Lookup(currentUser.BusinessID, branchID, query)
 	if err != nil {

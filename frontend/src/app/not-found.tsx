@@ -15,7 +15,7 @@ export default function NotFound(): JSX.Element {
       <div className="mx-auto w-full max-w-md text-center">
         <p className="font-serif text-title leading-none">Pastries POS</p>
         <p className="text-meta mt-8 font-mono text-foreground-muted">404</p>
-        <h1 className="text-heading mt-2 font-medium">This page does not exist</h1>
+        <h1 className="text-page mt-2">This page does not exist</h1>
         <p className="text-body mt-3 text-foreground-muted">
           The address may be mistyped, or the page may have moved. Nothing has been lost.
         </p>

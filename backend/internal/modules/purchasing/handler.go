@@ -270,6 +270,14 @@ func (h *Handler) CancelInvoice(c *gin.Context) {
 	respond(c, "purchase invoice cancelled successfully", result, err)
 }
 
+func (h *Handler) DeleteInvoice(c *gin.Context) {
+	if !validParam(c, "id") {
+		return
+	}
+	err := h.service.DeleteInvoice(utils.MustAuthContext(c), c.Param("id"), c.ClientIP(), c.Request.UserAgent())
+	respond(c, "draft purchase invoice deleted successfully", gin.H{"deleted": true, "delete_type": "hard_delete"}, err)
+}
+
 func (h *Handler) ConvertInvoiceToReceipt(c *gin.Context) {
 	if !validParam(c, "id") {
 		return
