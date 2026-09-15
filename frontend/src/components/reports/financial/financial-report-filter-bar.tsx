@@ -13,7 +13,6 @@ import {
   ReportFilterPopover,
 } from "@/components/reports/report-filter-popover";
 import { ReportPresetSelector } from "@/components/reports/report-preset-selector";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -22,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { resolveReportPresetRange } from "@/constants/report-presets";
+import { usePaymentMethods } from "@/hooks/use-payments";
 import type { Branch } from "@/types/branch";
 import type { FinancialReportFilters, FinancialReportGroupBy } from "@/types/financial-reports";
 import type { ReportDatePreset } from "@/types/reports";
@@ -111,6 +111,8 @@ export function FinancialReportFilterBar({
   sourceTypeOptions?: FinancialReportSelectOption[];
   statusOptions?: FinancialReportSelectOption[];
 }): JSX.Element {
+  const paymentMethods = usePaymentMethods().data ?? [];
+
   const setPreset = (datePreset: ReportDatePreset): void => {
     if (datePreset === "custom") {
       onChange({ ...filters, datePreset });
@@ -158,19 +160,37 @@ export function FinancialReportFilterBar({
           value={filters.branchId}
           onChange={(branchId) => onChange({ ...filters, branchId })}
         />
+        {/* A list, not an ID box. This asked for a payment method UUID, which
+            appears nowhere in the app, so the filter could not be used without
+            reading the database. Same defect as ISSUE-015 on the Payments page.
+
+            Regression: ISSUE-016 — report filters asked for UUIDs no operator can see
+            Found by /qa on 2026-09-15 */}
         <div className="space-y-2">
           <label
             className="text-sm font-medium text-brand-espresso"
             htmlFor="financial-payment-method"
           >
-            Payment method ID
+            Payment method
           </label>
-          <Input
-            id="financial-payment-method"
-            placeholder="Optional payment method UUID"
-            value={filters.paymentMethodId}
-            onChange={(event) => onChange({ ...filters, paymentMethodId: event.target.value })}
-          />
+          <Select
+            onValueChange={(value) =>
+              onChange({ ...filters, paymentMethodId: value === allValue ? "" : value })
+            }
+            value={filters.paymentMethodId || allValue}
+          >
+            <SelectTrigger id="financial-payment-method">
+              <SelectValue placeholder="All payment methods" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={allValue}>All payment methods</SelectItem>
+              {paymentMethods.map((method) => (
+                <SelectItem key={method.id} value={method.id}>
+                  {method.methodName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         {showGroupBy ? (
           <div className="space-y-2">

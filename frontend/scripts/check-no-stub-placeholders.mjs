@@ -45,37 +45,31 @@ function walk(directory) {
 // Each rule gets a reason, so a failure explains itself rather than pointing at
 // a regex. `sku_snapshot`-style prop names are not placeholders, so the checks
 // only read the STRING a user actually sees.
+// The snake_case rule that used to sit here was wrong, and it took two false
+// positives to see it. "Status key" and "Channel type" are fields whose VALUE
+// is a machine key the operator types, so `in_production` and
+// `delivery_platform` are correct examples of the expected format, not stubs.
+// Churning that copy to satisfy a bad rule would have made the app worse.
+//
+// What actually marks a stub is asking for an identifier the user cannot see,
+// or leaving a note to yourself in the box. "uuid" is matched as a SUBSTRING
+// rather than a word, because the original offender was `sale_uuid_here` and
+// `_` is a word character, so uuid never fires inside it.
 const stubPatterns = [
-  { label: "a snake_case token", test: (text) => /^[a-z0-9]+(_[a-z0-9]+){1,}$/.test(text) },
-  {
-    label: "a UUID or id stand-in",
-    test: (text) => /\b(uuid|id_here|your_id|some_id)\b/i.test(text),
-  },
+  { label: "a request for a UUID", test: (text) => /uuid/i.test(text) },
+  { label: "an id stand-in", test: (text) => /\b(id_here|your_id|some_id)\b/i.test(text) },
+  { label: "a _here suffix", test: (text) => /_here\b/i.test(text) },
   { label: "lorem ipsum", test: (text) => /lorem\s+ipsum/i.test(text) },
   { label: "a TODO or FIXME", test: (text) => /\b(todo|fixme|tbd|xxx)\b/i.test(text) },
   { label: "a foo/bar stand-in", test: (text) => /\b(foo|bar|baz|qux)\b/i.test(text) },
 ];
 
-// Known offenders, each owned by the module audit that will reach it.
+// Empty, and it should stay that way.
 //
-// This is a ratchet, not an amnesty. Every entry is the SAME defect as
-// ISSUE-015 -- a field asking the operator for a database identifier they
-// cannot see -- and each needs the same fix, a picker. They are listed rather
-// than silently skipped so the count can only go down, and anything NEW fails
-// immediately.
-//
-// Filter bars (Reports): four optional filters that cannot be used without
-// reading the database. Lookup hooks already exist in @/hooks/use-lookups.
-// Master data / settings: two snake_case stubs shown as example values.
-const KNOWN_STUBS = new Set([
-  "src/components/master-data/master-data-page-client.tsx: Optional parent category UUID",
-  "src/components/master-data/master-data-page-client.tsx: in_production",
-  "src/components/reports/bakery-orders/bakery-orders-report-filter-bar.tsx: Optional customer UUID",
-  "src/components/reports/financial/financial-report-filter-bar.tsx: Optional payment method UUID",
-  "src/components/reports/manufacturing/manufacturing-report-filter-bar.tsx: Optional product UUID",
-  "src/components/reports/manufacturing/manufacturing-report-filter-bar.tsx: Optional recipe UUID",
-  "src/components/settings/sales-channels-page-client.tsx: delivery_platform",
-]);
+// This started with seven entries: five fields asking for a UUID, and two that
+// turned out to be the rule's fault rather than the app's. All five are now
+// pickers. An entry here is a promise to come back, not permission to ship.
+const KNOWN_STUBS = new Set([]);
 
 const offenders = [];
 const stillKnown = new Set();
@@ -123,5 +117,7 @@ assert.deepEqual(
 );
 
 console.log(
-  `check-no-stub-placeholders: no new stub placeholders (${String(KNOWN_STUBS.size)} known, awaiting their module audits).`,
+  KNOWN_STUBS.size === 0
+    ? "check-no-stub-placeholders: no stub placeholders in src."
+    : `check-no-stub-placeholders: no new stub placeholders (${String(KNOWN_STUBS.size)} still known).`,
 );

@@ -449,19 +449,25 @@ function ProductCategoryIconPicker({
   );
 }
 
+const NO_PARENT_CATEGORY = "__none";
+
 function ProductCategoryDialog({
+  categories,
   category,
   isSubmitting,
   onOpenChange,
   onSubmit,
   open,
 }: {
+  categories: ProductCategory[];
   category: ProductCategory | null;
   isSubmitting: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (payload: CreateProductCategoryPayload) => Promise<void>;
   open: boolean;
 }): JSX.Element {
+  // A category cannot be its own parent, so the one being edited is not offered.
+  const parentCategoryOptions = categories.filter((option) => option.id !== category?.id);
   const form = useForm<ProductCategorySchema>({
     resolver: zodResolver(productCategorySchema),
     defaultValues: productCategoryDefaultValues,
@@ -611,14 +617,39 @@ function ProductCategoryDialog({
                 </FormItem>
               )}
             />
+            {/* A list, not an ID box. This asked for the parent category's UUID,
+                which appears nowhere in the app, so nesting a category was
+                impossible without reading the database. The dialog is given the
+                categories it can choose from, minus the one being edited, since
+                a category cannot be its own parent.
+
+                Regression: ISSUE-016 — forms and filters asked for UUIDs no operator can see
+                Found by /qa on 2026-09-15 */}
             <FormField
               control={form.control}
               name="parentCategoryId"
               render={({ field }) => (
                 <FormItem className="md:col-span-2">
-                  <FormLabel>Parent category ID</FormLabel>
+                  <FormLabel>Parent category</FormLabel>
                   <FormControl>
-                    <Input placeholder="Optional parent category UUID" {...field} />
+                    <Select
+                      onValueChange={(value) => {
+                        field.onChange(value === NO_PARENT_CATEGORY ? "" : value);
+                      }}
+                      value={field.value ?? NO_PARENT_CATEGORY}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="No parent category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={NO_PARENT_CATEGORY}>No parent category</SelectItem>
+                        {parentCategoryOptions.map((option) => (
+                          <SelectItem key={option.id} value={option.id}>
+                            {option.categoryName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -2703,6 +2734,7 @@ export function MasterDataPageClient({ collection }: MasterDataPageClientProps):
       ) : null}
       {collection === "product-categories" ? (
         <ProductCategoryDialog
+          categories={productCategoriesQuery.data ?? []}
           category={selectedProductCategory}
           isSubmitting={productCategorySubmitting}
           open={productDialogOpen}

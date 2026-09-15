@@ -13,7 +13,6 @@ import {
   ReportFilterPopover,
 } from "@/components/reports/report-filter-popover";
 import { ReportPresetSelector } from "@/components/reports/report-preset-selector";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -22,6 +21,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { resolveReportPresetRange } from "@/constants/report-presets";
+import { useProductPicker } from "@/hooks/use-lookups";
+import { useRecipes } from "@/hooks/use-recipes";
 import type { Branch } from "@/types/branch";
 import type {
   ManufacturingReportFilters,
@@ -84,6 +85,10 @@ export function ManufacturingReportFilterBar({
   onChange: (filters: ManufacturingReportFilterDraft) => void;
   onReset: () => void;
 }): JSX.Element {
+  const products = useProductPicker({ limit: 200 }).data?.items ?? [];
+  const recipes =
+    useRecipes({ active: "all", productId: "", search: "", status: "all" }).data ?? [];
+
   const setPreset = (datePreset: ReportDatePreset): void => {
     if (datePreset === "custom") {
       onChange({ ...filters, datePreset });
@@ -149,33 +154,63 @@ export function ManufacturingReportFilterBar({
             </SelectContent>
           </Select>
         </div>
+        {/* Lists, not ID boxes. Both of these asked for a UUID, which appears
+            nowhere in the app, so neither filter could be used without reading
+            the database. Same defect as ISSUE-015 on the Payments page.
+
+            Regression: ISSUE-016 — report filters asked for UUIDs no operator can see
+            Found by /qa on 2026-09-15 */}
         <div className="space-y-2">
           <label
             className="text-sm font-medium text-brand-espresso"
             htmlFor="manufacturing-product-id"
           >
-            Product ID
+            Product
           </label>
-          <Input
-            id="manufacturing-product-id"
-            placeholder="Optional product UUID"
-            value={filters.productId}
-            onChange={(event) => onChange({ ...filters, productId: event.target.value })}
-          />
+          <Select
+            onValueChange={(value) =>
+              onChange({ ...filters, productId: value === allValue ? "" : value })
+            }
+            value={filters.productId || allValue}
+          >
+            <SelectTrigger id="manufacturing-product-id">
+              <SelectValue placeholder="All products" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={allValue}>All products</SelectItem>
+              {products.map((product) => (
+                <SelectItem key={product.id} value={product.id}>
+                  {product.productName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-2">
           <label
             className="text-sm font-medium text-brand-espresso"
             htmlFor="manufacturing-recipe-id"
           >
-            Recipe ID
+            Recipe
           </label>
-          <Input
-            id="manufacturing-recipe-id"
-            placeholder="Optional recipe UUID"
-            value={filters.recipeId}
-            onChange={(event) => onChange({ ...filters, recipeId: event.target.value })}
-          />
+          <Select
+            onValueChange={(value) =>
+              onChange({ ...filters, recipeId: value === allValue ? "" : value })
+            }
+            value={filters.recipeId || allValue}
+          >
+            <SelectTrigger id="manufacturing-recipe-id">
+              <SelectValue placeholder="All recipes" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={allValue}>All recipes</SelectItem>
+              {recipes.map((recipe) => (
+                <SelectItem key={recipe.id} value={recipe.id}>
+                  {recipe.recipeName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-2">
           <label

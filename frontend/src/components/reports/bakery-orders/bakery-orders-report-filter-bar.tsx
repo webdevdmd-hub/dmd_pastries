@@ -13,7 +13,6 @@ import {
   ReportFilterPopover,
 } from "@/components/reports/report-filter-popover";
 import { ReportPresetSelector } from "@/components/reports/report-preset-selector";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -22,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { resolveReportPresetRange } from "@/constants/report-presets";
+import { useCustomers } from "@/hooks/use-customers";
 import type {
   BakeryOrdersReportFilters,
   BakeryOrdersReportGroupBy,
@@ -111,6 +111,9 @@ export function BakeryOrdersReportFilterBar({
   orderStatusOptions?: BakeryOrdersReportStatusOption[];
   paymentStatusOptions?: BakeryOrdersReportStatusOption[];
 }): JSX.Element {
+  const customers =
+    useCustomers({ dateFrom: "", dateTo: "", search: "", status: "all", tagId: "" }).data ?? [];
+
   const setPreset = (datePreset: ReportDatePreset): void => {
     if (datePreset === "custom") {
       onChange({ ...filters, datePreset });
@@ -161,19 +164,37 @@ export function BakeryOrdersReportFilterBar({
           value={filters.branchId}
           onChange={(branchId) => onChange({ ...filters, branchId })}
         />
+        {/* A list, not an ID box. This asked for a customer UUID, which appears
+            nowhere in the app, so the filter could not be used without reading
+            the database. Same defect as ISSUE-015 on the Payments page.
+
+            Regression: ISSUE-016 — report filters asked for UUIDs no operator can see
+            Found by /qa on 2026-09-15 */}
         <div className="space-y-2">
           <label
             className="text-sm font-medium text-brand-espresso"
             htmlFor="bakery-report-customer"
           >
-            Customer ID
+            Customer
           </label>
-          <Input
-            id="bakery-report-customer"
-            placeholder="Optional customer UUID"
-            value={filters.customerId}
-            onChange={(event) => onChange({ ...filters, customerId: event.target.value })}
-          />
+          <Select
+            onValueChange={(value) =>
+              onChange({ ...filters, customerId: value === allValue ? "" : value })
+            }
+            value={filters.customerId || allValue}
+          >
+            <SelectTrigger id="bakery-report-customer">
+              <SelectValue placeholder="All customers" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={allValue}>All customers</SelectItem>
+              {customers.map((customer) => (
+                <SelectItem key={customer.id} value={customer.id}>
+                  {customer.fullName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-2">
           <label
