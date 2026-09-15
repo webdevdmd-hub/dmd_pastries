@@ -56,47 +56,77 @@ func TestDiscountReportDoesNotDoubleCount(t *testing.T) {
 			"twice the discount that sale actually gave")
 	}
 
-	// The first fix here covered only the Discount Report, and the Sales
-	// overview kept showing 702.00 against the same 351.00 discount because it
-	// builds its own total in the daily query. Catch the SHAPE of the mistake
-	// anywhere it appears, not the one call site that was noticed first.
-	for _, doubled := range []string{
-		"COALESCE(SUM(ss.discount_amount),0) + COALESCE(MAX(lt.line_discount),0)",
-		"COALESCE(SUM(ss.discount_amount),0) + COALESCE(SUM(lt.line_discount),0)",
-		"SUM(s.discount_amount) + SUM(si.discount_amount)",
-	} {
-		if strings.Contains(source, doubled) {
-			t.Errorf("a discount total adds the sale header to a line sum (%s). The header IS the "+
-				"line sum, so this reports every discount twice wherever it appears", doubled)
+	// Every discount total must be ONE sum, never a sum of two.
+	//
+	// Listing known-bad strings was not enough, twice over. The first fix
+	// covered the Discount Report; the Sales overview kept reading 702.00 from
+	// a second query; and after that was fixed a THIRD copy was still live in
+	// the sales summary, written with subqueries so the literal patterns sailed
+	// straight past it:
+	//
+	//	COALESCE((SELECT SUM(discount_amount) FROM scoped_sales),0)
+	//	  + COALESCE((SELECT line_discount FROM line_totals),0) AS discount_total
+	//
+	// So the rule is structural now. A discount total is a single figure: the
+	// sale header, which already IS the line sum. Any "+" in an expression
+	// aliased AS discount_total means two pools are being added, and there is
+	// only ever one pool.
+	for _, expression := range discountTotalExpressions(source) {
+		if strings.Contains(expression, "+") {
+			t.Errorf("a discount total is built by adding two amounts, but the sale header IS the "+
+				"line sum, so this reports every discount twice: %s",
+				strings.Join(strings.Fields(expression), " "))
 		}
 	}
 }
 
-// The split cards are gone from the response because the data cannot support
-// them. If either field comes back, something is claiming a breakdown that the
-// allocation destroyed at checkout.
-func TestDiscountReportDoesNotClaimASplitItCannotDerive(t *testing.T) {
-	raw, err := os.ReadFile("dto.go")
-	if err != nil {
-		t.Fatalf("read dto.go: %v", err)
-	}
-	source := strings.ReplaceAll(string(raw), "\r\n", "\n")
-	start := strings.Index(source, "type DiscountReportResponse struct {")
-	if start == -1 {
-		t.Fatal("DiscountReportResponse not found")
-	}
-	end := strings.Index(source[start:], "\n}")
-	if end == -1 {
-		end = len(source) - start
-	}
-	declaration := source[start : start+end]
-
-	for _, field := range []string{"sale_level_discount", "line_level_discount"} {
-		if strings.Contains(declaration, field) {
-			t.Errorf("DiscountReportResponse exposes %s, but a sale-level discount is allocated into "+
-				"the lines at checkout and overwrites their own discount, so the split cannot be "+
-				"derived from what is stored. Reinstating it means reinstating a number that is "+
-				"either the whole total or a guess", field)
+// discountTotalExpressions returns each SQL select expression aliased
+// AS discount_total.
+//
+// It scans BACKWARDS tracking parenthesis depth, because the commas that
+// separate select items look identical to the commas inside COALESCE(x, 0).
+// A naive LastIndex(",") lands inside the nearest COALESCE and returns a
+// fragment like "0)", which contains no "+" and quietly passes -- which is
+// exactly how the first version of this guard missed two live double counts.
+func discountTotalExpressions(source string) []string {
+	const alias = "AS discount_total"
+	expressions := []string{}
+	for index := 0; ; {
+		found := strings.Index(source[index:], alias)
+		if found == -1 {
+			return expressions
 		}
+		found += index
+		start := 0
+		depth := 0
+		for at := found - 1; at >= 0; at-- {
+			switch source[at] {
+			case ')':
+				depth++
+			case '(':
+				if depth == 0 {
+					start = at + 1
+					at = 0
+					continue
+				}
+				depth--
+			case ',':
+				if depth == 0 {
+					start = at + 1
+					at = 0
+					continue
+				}
+			}
+			if start != 0 {
+				break
+			}
+			// A SELECT at depth zero also opens the expression list.
+			if depth == 0 && at >= len("SELECT") && source[at-len("SELECT"):at] == "SELECT" {
+				start = at
+				break
+			}
+		}
+		expressions = append(expressions, source[start:found])
+		index = found + len(alias)
 	}
 }

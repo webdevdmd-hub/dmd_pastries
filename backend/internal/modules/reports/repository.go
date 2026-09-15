@@ -2623,8 +2623,14 @@ func (r *Repository) salesReportSummaryForRange(filter *shared.ResolvedFilter, s
 		       COALESCE((SELECT COUNT(*) FROM scoped_sales ss
 		                  WHERE ` + reportActiveSaleStatusCondition("ss") + `),0) AS sales_count,
 		       COALESCE((SELECT items_sold FROM line_totals),0)            AS items_sold,
-		       COALESCE((SELECT SUM(discount_amount) FROM scoped_sales),0)
-		         + COALESCE((SELECT line_discount FROM line_totals),0)     AS discount_total,
+		       -- The header alone. A sale-level discount is allocated into the
+		       -- lines at checkout and the header is then the sum of those
+		       -- lines, so adding the two reports every discount twice. This is
+		       -- the query behind the Sales overview "Discount Total".
+		       --
+		       -- Regression: ISSUE-013 — the discount report counted every discount twice
+		       -- Found by /qa on 2026-09-14
+		       COALESCE((SELECT SUM(discount_amount) FROM scoped_sales),0)  AS discount_total,
 		       COALESCE((SELECT SUM(tax_amount)      FROM scoped_sales),0) AS tax_total`
 
 	// Placeholders are positional and the query is assembled from three
