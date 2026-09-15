@@ -203,6 +203,18 @@ func (s *Service) DeleteSupplier(currentUser *utils.AuthContext, id, ipAddress, 
 		return err
 	}
 	return s.withTransaction(func(tx *gorm.DB) error {
+		references, err := s.repo.SupplierHistoryReferences(tx, currentUser.BusinessID, branchID, id)
+		if err != nil {
+			return apperrors.Internal("failed to check supplier history")
+		}
+		if len(references) > 0 {
+			// Mirrors DeleteProduct. Deactivating keeps the records and, per the
+			// menu, still allows receiving and paying what is already open.
+			return apperrors.Conflict("Supplier has purchase history and cannot be deleted. Deactivate it instead.", map[string]interface{}{
+				"reason":     "supplier_has_history",
+				"references": references,
+			})
+		}
 		if err := s.repo.Update(tx, id, currentUser.BusinessID, branchID, map[string]interface{}{"status": "inactive", "updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC(), "deleted_at": gorm.DeletedAt{Time: time.Now().UTC(), Valid: true}}); err != nil {
 			return mapSupplierNotFound(err, "supplier not found")
 		}
