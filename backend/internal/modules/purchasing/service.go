@@ -1780,14 +1780,14 @@ func (s *Service) CancelInvoice(currentUser *utils.AuthContext, id string, req C
 			return err
 		}
 		if payments > 0 {
-			return apperrors.Conflict("purchase invoice has completed supplier payments and cannot be cancelled", map[string]interface{}{"reason": "purchase_invoice_has_payments"})
+			return apperrors.Conflict(cancelBlockedByPayments, map[string]interface{}{"reason": "purchase_invoice_has_payments"})
 		}
 		vendorCredits, err := s.repo.PostedPurchaseReturnCountForInvoice(tx, currentUser.BusinessID, id)
 		if err != nil {
 			return err
 		}
 		if vendorCredits > 0 {
-			return apperrors.Conflict("purchase invoice has posted vendor credits and cannot be cancelled", map[string]interface{}{"reason": "purchase_invoice_has_vendor_credits"})
+			return apperrors.Conflict(cancelBlockedByVendorCredits, map[string]interface{}{"reason": "purchase_invoice_has_vendor_credits"})
 		}
 		reversalMovementIDs, cancelledReceiptID, err := s.reverseBillInventory(tx, currentUser, invoice)
 		if err != nil {
@@ -3984,6 +3984,7 @@ func (s *Service) invoiceResponse(businessID string, invoice PurchaseInvoice, in
 	response.ReceiveStatus = receiveStatus
 	response.CanReceiveStock = canReceive
 	response.CanEdit, response.EditBlockedReason = invoiceEditability(invoice, receiveStatus)
+	response.CanCancel, response.CancelBlockedReason = invoiceCancellability(invoice)
 	if includeItems {
 		for _, item := range items {
 			unitID := deref(item.UnitID)
@@ -4010,6 +4011,38 @@ type invoiceReceiveLineState struct {
 // response already holds, so the list does not pay three extra queries a row.
 // It is a hint for the UI, never a substitute: the guard inside the update
 // transaction is what actually decides, and it re-checks all three conditions.
+// The two refusals CancelInvoice can meet on a posted bill. Shared by the
+// refusal itself and by the menu hint, so they say the same thing, and each
+// says what to do next.
+const (
+	cancelBlockedByPayments      = "This bill has supplier payments against it, so it cannot be cancelled. Delete those payments on Payments Made first."
+	cancelBlockedByVendorCredits = "This bill has posted vendor credits against it, so it cannot be cancelled. Reverse those vendor credits first."
+)
+
+// invoiceCancellability is the advisory form of CancelInvoice's checks, from
+// figures the response already carries. The server still decides on submit.
+//
+// Regression: ISSUE-027 — Cancel bill was offered on bills the server always refuses to cancel
+// Found by /qa on 2026-09-15
+func invoiceCancellability(invoice PurchaseInvoice) (bool, string) {
+	switch invoice.Status {
+	case "posted":
+	case "draft":
+		return false, "A draft bill is deleted, not cancelled."
+	case "cancelled":
+		return false, "This bill is already cancelled."
+	default:
+		return false, ""
+	}
+	if invoice.PaidAmount > 0 {
+		return false, cancelBlockedByPayments
+	}
+	if invoice.CreditedAmount > 0 {
+		return false, cancelBlockedByVendorCredits
+	}
+	return true, ""
+}
+
 func invoiceEditability(invoice PurchaseInvoice, receiveStatus string) (bool, string) {
 	switch invoice.Status {
 	case "draft":
