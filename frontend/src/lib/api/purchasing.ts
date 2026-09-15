@@ -593,6 +593,8 @@ function parseInvoice(value: unknown): PurchaseInvoice {
     // than silently hiding Edit everywhere.
     canEdit: typeof value.can_edit === "boolean" ? value.can_edit : true,
     editBlockedReason: stringValue(value.edit_blocked_reason),
+    canCancel: typeof value.can_cancel === "boolean" ? value.can_cancel : true,
+    cancelBlockedReason: stringValue(value.cancel_blocked_reason),
     notes: optionalString(value.notes),
     cancelledAt: optionalString(value.cancelled_at),
     cancelledByUserId: optionalString(value.cancelled_by_user_id),
@@ -897,6 +899,8 @@ function parseDocumentChainInvoice(value: unknown): PurchaseInvoice {
     canReceiveStock: typeof value.can_receive_stock === "boolean" ? value.can_receive_stock : false,
     canEdit: typeof value.can_edit === "boolean" ? value.can_edit : true,
     editBlockedReason: stringValue(value.edit_blocked_reason),
+    canCancel: typeof value.can_cancel === "boolean" ? value.can_cancel : true,
+    cancelBlockedReason: stringValue(value.cancel_blocked_reason),
     reversalJournalEntryId: optionalString(value.reversal_journal_entry_id),
     status: isInvoiceStatus(value.status) ? value.status : "draft",
     subtotalAmount: 0,

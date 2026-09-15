@@ -106,7 +106,14 @@ export function PurchaseInvoiceActionsMenu({
             {invoice.status === "posted" ? (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-danger-text" onSelect={() => onCancel(invoice)}>
+                {/* Greyed with the server's reason, like Edit: a paid bill used to
+                    open the cancel dialog, take a reason, and then be refused. */}
+                <DropdownMenuItem
+                  className="text-danger-text"
+                  disabled={!invoice.canCancel}
+                  onSelect={() => onCancel(invoice)}
+                  title={invoice.canCancel ? undefined : invoice.cancelBlockedReason}
+                >
                   Cancel bill
                 </DropdownMenuItem>
               </>
