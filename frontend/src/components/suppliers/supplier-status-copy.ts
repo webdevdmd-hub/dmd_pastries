@@ -28,7 +28,7 @@ export const SUPPLIER_STATUS_COPY: Record<SupplierStatus, StatusCopy> = {
     effects: [
       { allowed: true, text: "New purchase orders" },
       { allowed: true, text: "New bills" },
-      { allowed: true, text: "Shown in supplier pickers" },
+      { allowed: true, text: "Offered when starting new orders or bills" },
     ],
     verb: "Activate",
   },
@@ -38,7 +38,10 @@ export const SUPPLIER_STATUS_COPY: Record<SupplierStatus, StatusCopy> = {
     effects: [
       { allowed: false, text: "New purchase orders" },
       { allowed: true, text: "Receiving and paying what is already open" },
-      { allowed: false, text: "Shown in supplier pickers" },
+      // Not "shown in supplier pickers": an inactive supplier still appears,
+      // marked Inactive, where paying or receiving what is open needs it.
+      // lib/purchasing/supplier-use.ts decides which pickers.
+      { allowed: false, text: "Offered when starting new orders or bills" },
     ],
     verb: "Deactivate",
   },

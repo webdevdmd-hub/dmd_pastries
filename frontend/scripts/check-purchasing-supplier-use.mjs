@@ -140,7 +140,20 @@ assert.equal(
     "silently truncates the list the browser searches",
 );
 
-// --- 4. Shape: no purchasing picker maps the raw list ------------------------
+// --- 4. The status dialog describes what the pickers do ----------------------
+
+// The Deactivate dialog said "Shown in supplier pickers: not allowed" while also
+// promising "paying what is already open: allowed". Payments Made can only pay a
+// supplier it can offer, so both could not be true. The owner chose on
+// 2026-09-15: show non-active suppliers where the action is allowed, marked.
+const statusCopy = read(resolve(rootDir, "src/components/suppliers/supplier-status-copy.ts"));
+assert.ok(
+  !/Shown in supplier pickers/.test(statusCopy),
+  "supplier-status-copy promises a status hides the supplier from pickers, but the payment and " +
+    "receiving pickers deliberately show inactive and blocked suppliers",
+);
+
+// --- 5. Shape: no purchasing picker maps the raw list ------------------------
 
 function walk(directory) {
   return readdirSync(directory).flatMap((entry) => {
