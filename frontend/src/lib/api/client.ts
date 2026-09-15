@@ -1,3 +1,4 @@
+import { joinErrorMessage } from "@/lib/api/error-message";
 import { classifyApiMonitorStatus, recordApiMonitorEvent } from "@/lib/api-monitor/store";
 import { clearCachedAccessToken, getAccessToken } from "@/lib/auth/session";
 import { notifySessionExpired } from "@/lib/auth/session-events";
@@ -154,12 +155,12 @@ function normalizeErrors(value: unknown): FieldErrorMap | undefined {
 }
 
 function normalizeBackendError(value: unknown): {
-  messageSuffix?: string;
+  details?: string[];
   errors?: FieldErrorMap;
 } {
   if (typeof value === "string" && value.length > 0) {
     return {
-      messageSuffix: value,
+      details: [value],
     };
   }
 
@@ -168,7 +169,7 @@ function normalizeBackendError(value: unknown): {
   if (errors) {
     return {
       errors,
-      messageSuffix: Object.values(errors).flat().join(", "),
+      details: Object.values(errors).flat(),
     };
   }
 
@@ -177,7 +178,7 @@ function normalizeBackendError(value: unknown): {
 
     if (stringItems.length > 0) {
       return {
-        messageSuffix: stringItems.join(", "),
+        details: stringItems,
       };
     }
   }
@@ -201,9 +202,11 @@ function normalizeApiResponse(value: unknown): ApiResponse<unknown> {
   if (success === false || ("error" in value && value.error !== undefined)) {
     const errors = backendError.errors ?? backendErrors.errors;
     const errorDetails = isObject(value.errors) ? value.errors : undefined;
-    const messageSuffix = backendError.messageSuffix ?? backendErrors.messageSuffix;
-    const resolvedMessage =
-      messageSuffix && messageSuffix !== message ? `${message}: ${messageSuffix}` : message;
+    // Only prose details reach the message; codes, statuses and ids stay on errors.
+    const resolvedMessage = joinErrorMessage(
+      message,
+      backendError.details ?? backendErrors.details ?? [],
+    );
 
     return {
       success: false,

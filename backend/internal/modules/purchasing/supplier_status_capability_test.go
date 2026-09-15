@@ -160,3 +160,30 @@ func functionBody(source, marker string) string {
 	}
 	return rest
 }
+
+// Regression: ISSUE-026 — the inactive-supplier refusal named the wrong action and leaked its code.
+//
+// Verifying ISSUE-023 on production on 2026-09-15, a 1.00 advance to inactive
+// QA Flour Co was correctly refused, with the toast "this supplier is inactive;
+// reactivate it before raising new purchase documents: inactive". The operator
+// had raised no document, the message did not say their posted bills could
+// still be paid, and the status code was appended to the sentence.
+func TestSupplierRefusalSaysWhatIsStillAllowed(t *testing.T) {
+	for status, must := range map[string][]string{
+		"inactive": {"Reactivate", "advance", "posted bills"},
+		"blocked":  {"Unblock", "posted bills"},
+	} {
+		message := supplierRefusalMessage(status)
+		for _, word := range must {
+			if !strings.Contains(message, word) {
+				t.Errorf("%s refusal %q must mention %q: say what the status stops and what it still allows", status, message, word)
+			}
+		}
+		if strings.Contains(message, "purchase documents") {
+			t.Errorf("%s refusal %q talks about purchase documents; the refused action may be a payment", status, message)
+		}
+		if message == "" || strings.ToUpper(message[:1]) != message[:1] {
+			t.Errorf("%s refusal %q must be a sentence a person reads", status, message)
+		}
+	}
+}
