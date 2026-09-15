@@ -63,6 +63,56 @@ func (r *Repository) FindByID(id, businessID, branchID string) (*Supplier, error
 	return &supplier, err
 }
 
+// SupplierHistoryReference names one kind of record that ties a supplier to the
+// books, and how many there are.
+type SupplierHistoryReference struct {
+	Reference string `json:"reference"`
+	Count     int64  `json:"count"`
+}
+
+// SupplierHistoryReferences lists every purchasing record that still points at
+// the supplier. A supplier with any of these cannot be deleted.
+//
+// The supplier menu promises "Delete — Only if nothing references it." Nothing
+// checked. DeleteSupplier soft-deleted and deactivated unconditionally, so a
+// supplier with open bills and an unpaid balance could be deleted, and every
+// payment against those bills then failed ValidateSupplier ("supplier not
+// found"): the liability stayed on the books and became unpayable in the app.
+//
+// Contacts, notes and ingredient/packaging preferred-supplier links are profile
+// data, not history, and do not block deletion.
+//
+// Regression: ISSUE-020 — suppliers with purchase history could be deleted
+// Found by /qa on 2026-09-15
+func (r *Repository) SupplierHistoryReferences(tx *gorm.DB, businessID, branchID, supplierID string) ([]SupplierHistoryReference, error) {
+	checks := []struct {
+		reference string
+		query     string
+		args      []interface{}
+	}{
+		{"purchase_orders", "SELECT COUNT(*) FROM purchase_orders WHERE business_id = ? AND branch_id = ? AND supplier_id = ? AND deleted_at IS NULL", []interface{}{businessID, branchID, supplierID}},
+		{"purchase_receipts", "SELECT COUNT(*) FROM purchase_receipts WHERE business_id = ? AND branch_id = ? AND supplier_id = ? AND deleted_at IS NULL", []interface{}{businessID, branchID, supplierID}},
+		{"purchase_invoices", "SELECT COUNT(*) FROM purchase_invoices WHERE business_id = ? AND branch_id = ? AND supplier_id = ? AND deleted_at IS NULL", []interface{}{businessID, branchID, supplierID}},
+		{"purchase_invoice_payments", "SELECT COUNT(*) FROM purchase_invoice_payments WHERE business_id = ? AND branch_id = ? AND supplier_id = ? AND deleted_at IS NULL", []interface{}{businessID, branchID, supplierID}},
+		{"supplier_payments", "SELECT COUNT(*) FROM supplier_payments WHERE business_id = ? AND branch_id = ? AND supplier_id = ? AND deleted_at IS NULL", []interface{}{businessID, branchID, supplierID}},
+		{"purchase_returns", "SELECT COUNT(*) FROM purchase_returns WHERE business_id = ? AND branch_id = ? AND supplier_id = ? AND deleted_at IS NULL", []interface{}{businessID, branchID, supplierID}},
+		// A go-live opening payable is a liability to this supplier with no
+		// document behind it, so it counts as history too.
+		{"counterparty_opening_balances", "SELECT COUNT(*) FROM counterparty_opening_balances WHERE business_id = ? AND branch_id = ? AND party_type = 'supplier' AND party_id = ? AND deleted_at IS NULL", []interface{}{businessID, branchID, supplierID}},
+	}
+	references := make([]SupplierHistoryReference, 0)
+	for _, check := range checks {
+		var count int64
+		if err := tx.Raw(check.query, check.args...).Scan(&count).Error; err != nil {
+			return nil, err
+		}
+		if count > 0 {
+			references = append(references, SupplierHistoryReference{Reference: check.reference, Count: count})
+		}
+	}
+	return references, nil
+}
+
 func (r *Repository) Update(tx *gorm.DB, id, businessID, branchID string, updates map[string]interface{}) error {
 	result := tx.Model(&Supplier{}).Where("id = ? AND business_id = ? AND branch_id = ? AND deleted_at IS NULL", id, businessID, branchID).Updates(updates)
 	if result.Error != nil {
