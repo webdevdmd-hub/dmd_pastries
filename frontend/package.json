@@ -51,6 +51,7 @@
     "test:no-stub-placeholders": "node scripts/check-no-stub-placeholders.mjs",
     "test:payment-stage-label": "node scripts/check-payment-stage-label.mjs",
     "test:product-flag-labels": "node scripts/check-product-flag-labels.mjs",
+    "test:purchasing-supplier-use": "node scripts/check-purchasing-supplier-use.mjs",
     "test:zero-total-checkout": "node scripts/check-zero-total-checkout.mjs"
   },
   "lint-staged": {

@@ -61,6 +61,7 @@ import type {
   UpdateSupplierPaymentPayload,
 } from "@/types/purchasing";
 import type { PaymentMethod } from "@/types/settings";
+import type { SupplierStatus } from "@/types/supplier";
 
 type BackendLinePayload = {
   id?: string | undefined;
@@ -1050,7 +1051,12 @@ function parseSupplier(value: unknown): PurchasingSupplierOption {
   return {
     id: stringValue(value.id),
     supplierName: stringValue(value.supplier_name, "Supplier"),
+    status: supplierStatusValue(value.status),
   };
+}
+
+function supplierStatusValue(value: unknown): SupplierStatus {
+  return value === "inactive" || value === "blocked" ? value : "active";
 }
 
 function parseProduct(value: unknown): PurchasingProductOption {
@@ -2100,9 +2106,21 @@ export async function cancelPurchaseReceipt(id: string): Promise<PurchaseReceipt
   return response.data;
 }
 
+/** Matches supplierLookupMaxLimit in backend/internal/modules/suppliers/dto.go. */
+export const PURCHASING_SUPPLIER_LOOKUP_LIMIT = 200;
+
 export async function lookupSuppliers(search = ""): Promise<PurchasingSupplierOption[]> {
   const response = await apiRequest<PurchasingSupplierOption[]>(
-    `/api/v1/suppliers/lookup${toQueryString({ search, limit: 20 })}`,
+    // Every purchasing screen loads this list once and searches it in the
+    // browser, so it must be the WHOLE list: the old limit of 20 hid the 21st
+    // supplier onward from every purchasing picker. Inactive and blocked
+    // suppliers are included because their open orders, posted bills and
+    // history are still reachable; each picker narrows by use.
+    `/api/v1/suppliers/lookup${toQueryString({
+      search,
+      limit: PURCHASING_SUPPLIER_LOOKUP_LIMIT,
+      include_inactive: "true",
+    })}`,
     {
       authMode: "appwrite",
       parse: (data) => parseList(data, parseSupplier),

@@ -441,6 +441,7 @@ export function PurchaseSupplierPaymentAllocationDialog({
                 id="purchase-supplier-payment-allocati-supplier"
                 onValueChange={onSupplierChange}
                 suppliers={suppliers}
+                use="payment"
                 value={selectedSupplierId}
               />
               <p className="min-h-5 text-xs leading-5 text-brand-mocha">

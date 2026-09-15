@@ -22,7 +22,17 @@ type SupplierListQuery struct {
 type SupplierLookupQuery struct {
 	Search string
 	Limit  int
+	// IncludeInactive also returns inactive and blocked suppliers. Purchasing
+	// needs them: their open orders can still be received, their posted bills
+	// can still be paid, and their history can still be filtered. Pickers that
+	// only start new documents leave it false.
+	IncludeInactive bool
 }
+
+// supplierLookupMaxLimit caps one lookup page. Purchasing loads the whole
+// supplier list once and searches it in the browser, so a cap below the number
+// of suppliers hides every supplier past it from every purchasing picker.
+const supplierLookupMaxLimit = 200
 
 type SupplierStatementQuery struct {
 	DateFrom        string

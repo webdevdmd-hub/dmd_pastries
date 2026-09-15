@@ -404,6 +404,7 @@ export function PurchaseReceiveDialog({
                 id="receive-supplier"
                 onValueChange={setSupplierId}
                 suppliers={suppliers}
+                use={purchaseOrderId ? "open_document" : "new_document"}
                 value={supplierId}
               />
             </div>

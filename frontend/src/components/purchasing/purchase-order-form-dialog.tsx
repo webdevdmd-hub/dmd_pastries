@@ -738,11 +738,12 @@ export function PurchaseOrderFormDialog({
                             id="po-supplier"
                             onValueChange={setSupplierId}
                             suppliers={suppliers}
+                            use="new_document"
                             value={supplierId}
                           />
                         </div>
                         {lockReason ? <FieldHint>{lockReason}</FieldHint> : null}
-                        {suppliers.length === 0 ? (
+                        {suppliers.every((supplier) => supplier.status !== "active") ? (
                           <FieldHint>No suppliers available — add a supplier first.</FieldHint>
                         ) : null}
                         <FieldError message={supplierFieldError} />

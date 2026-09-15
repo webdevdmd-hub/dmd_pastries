@@ -334,6 +334,7 @@ export function PurchaseInvoiceFormDialog({
                 id="bill-supplier"
                 onValueChange={setSupplierId}
                 suppliers={suppliers}
+                use={purchaseOrderId ? "open_document" : "new_document"}
                 value={supplierId}
               />
             </Field>
