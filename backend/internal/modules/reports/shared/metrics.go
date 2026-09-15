@@ -11,8 +11,45 @@ import (
 var (
 	RevenueJournalSources    = []string{"pos_sale", "bakery_order_revenue", "pos_sale_void", "sales_return"}
 	GrossRevenueSources      = []string{"pos_sale", "bakery_order_revenue", "pos_sale_void"}
-	CollectionJournalSources = []string{"pos_sale", "bakery_order_payment"}
-	RefundJournalSources     = []string{"sales_return", "pos_sale_refund"}
+	// Money INTO a payment account, and money OUT of one.
+	//
+	// These lists had three holes, all provable from the refund contract in
+	// accounting/refund_contract.go rather than inferred:
+	//
+	//   pos_sale_payment             the contract calls it "money collected".
+	//                                It is every tender taken AFTER checkout,
+	//                                through Payments > Record payment.
+	//   bakery_order_advance_refund  the contract's declared reversal of
+	//                                bakery_order_payment, which IS counted as
+	//                                money in. Counting a deposit but not its
+	//                                refund overstates Net Collected.
+	//   bakery_order_refund          the post-completion money refund, built by
+	//                                the same refund builder as pos_sale_refund,
+	//                                which IS counted.
+	//   pos_sale_void                the contract's declared "mirror reversal" of
+	//                                pos_sale, so voiding a paid sale credits the
+	//                                cash pos_sale debited. Without it Net
+	//                                Collected keeps every voided sale's money.
+	//                                The revenue lists above already net voids;
+	//                                this brings collections into line. Found by
+	//                                the contract test below, not by hand.
+	//
+	// The first was measured live on 2026-09-15: a 251.00 balance paid through
+	// Record payment posted correctly (Cash in Hand 852.00 in the trial
+	// balance) while Financial Reports read Total Collected 601.00 and raised
+	// a drift warning against the operational 852.00. The ledger was right; this
+	// list was not asking it about that journal type.
+	//
+	// It was unreachable until ISSUE-015, because Record payment demanded a sale
+	// UUID nobody could type. Making that action usable is what exposed it.
+	//
+	// account_transfer and platform_settlement stay out on purpose: they move
+	// money between the business's own accounts and are not collections.
+	//
+	// Regression: ISSUE-017 — Financial Reports under-counted payments taken after checkout
+	// Found by /qa on 2026-09-15
+	CollectionJournalSources = []string{"pos_sale", "pos_sale_payment", "bakery_order_payment"}
+	RefundJournalSources     = []string{"sales_return", "pos_sale_refund", "pos_sale_void", "bakery_order_refund", "bakery_order_advance_refund"}
 )
 
 const stockMovementsMissingJournalsQuery = `
