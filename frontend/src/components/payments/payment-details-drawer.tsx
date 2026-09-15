@@ -23,7 +23,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { ROUTES } from "@/constants/routes";
-import { orderPaymentTypeLabel } from "@/lib/orders/payment-stage";
+import { paymentStageLabel } from "@/lib/orders/payment-stage";
 import type { PaymentRefund, SalePayment } from "@/types/payment";
 
 type PaymentDetailsDrawerProps = {
@@ -186,7 +186,10 @@ function PaymentDetailsDrawerBody({
             <div className="grid gap-2 sm:grid-cols-2">
               <DetailRow label="Source" value={paymentSourceLabel(payment)} />
               <DetailRow label="Branch" value={payment.branchName} />
-              <DetailRow label="Payment type" value={orderPaymentTypeLabel(payment.paymentType)} />
+              <DetailRow
+                label="Payment type"
+                value={paymentStageLabel(payment.paymentType, payment.sourceType)}
+              />
               <DetailRow label="Reference" value={payment.referenceNumber ?? "No reference"} />
               <DetailRow
                 label="Provider transaction"

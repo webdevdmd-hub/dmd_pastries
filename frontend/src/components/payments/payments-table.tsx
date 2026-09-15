@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { orderPaymentTypeLabel } from "@/lib/orders/payment-stage";
+import { paymentStageLabel } from "@/lib/orders/payment-stage";
 import type { SalePayment } from "@/types/payment";
 
 export type PaymentsListProps = {
@@ -94,12 +94,12 @@ export function PaymentsTable({
             <TableCell>
               {/* Regression: ISSUE-010 — a POS sale has no order payment stage, and
                   the stage label fell through to "Not set", which read as a data
-                  gap on every counter sale. Found by /qa on 2026-09-14. */}
-              {payment.paymentType
-                ? orderPaymentTypeLabel(payment.paymentType)
-                : payment.sourceType === "bakery_order"
-                  ? "Not set"
-                  : "Sale payment"}
+                  gap on every counter sale. Found by /qa on 2026-09-14.
+
+                  The rule moved into paymentStageLabel: it was inline here, so
+                  the card grid and the details drawer never got it and the bug
+                  stayed live in the default view. See ISSUE-014. */}
+              {paymentStageLabel(payment.paymentType, payment.sourceType)}
             </TableCell>
             <TableCell className="text-right font-medium tabular-nums">
               {formatPaymentMoney(payment.amount)}
