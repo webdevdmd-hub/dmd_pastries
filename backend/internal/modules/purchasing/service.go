@@ -1713,14 +1713,14 @@ func (s *Service) DeleteInvoice(currentUser *utils.AuthContext, id, ipAddress, u
 			return err
 		}
 		if invoice.Status != "draft" {
-			return apperrors.Conflict("only draft bills can be deleted; cancel a posted bill instead", map[string]interface{}{"reason": "purchase_invoice_not_draft"})
+			return apperrors.Conflict("Only draft bills can be deleted. Cancel a posted bill instead.", map[string]interface{}{"reason": "purchase_invoice_not_draft"})
 		}
 		references, err := s.repo.InvoiceReferenceCount(tx, currentUser.BusinessID, invoice.ID)
 		if err != nil {
 			return err
 		}
 		if references > 0 {
-			return apperrors.Conflict("this draft bill is referenced by payments, receipts or returns and cannot be deleted", map[string]interface{}{"reason": "purchase_invoice_has_history"})
+			return apperrors.Conflict("This draft bill is referenced by payments, receipts or returns, so it cannot be deleted.", map[string]interface{}{"reason": "purchase_invoice_has_history"})
 		}
 		if err := s.repo.HardDeleteDraftInvoice(tx, currentUser.BusinessID, invoice.ID); err != nil {
 			return err
@@ -3441,28 +3441,29 @@ func (s *Service) requireSupplier(tx *gorm.DB, businessID, branchID, supplierID 
 	if supplierAllows(supplier.Status, use) {
 		return supplier, nil
 	}
-	switch supplier.Status {
-	case "blocked":
-		return nil, apperrors.BadRequest("this supplier is blocked; unblock it before raising or receiving purchase documents", map[string]interface{}{"supplier_status": supplier.Status})
+	return nil, apperrors.BadRequest(supplierRefusalMessage(supplier.Status), map[string]interface{}{"supplier_status": supplier.Status})
+}
+
+// supplierRefusalMessage says what the status stops AND what it still allows,
+// in the status dialogs' own terms. The first version said "reactivate it
+// before raising new purchase documents" to an operator recording an advance
+// payment, who had raised no document, and began in lower case.
+//
+// Regression: ISSUE-026 — the inactive-supplier refusal named the wrong action and leaked its code
+// Found by /qa on 2026-09-15
+func supplierRefusalMessage(status string) string {
+	switch status {
 	case "inactive":
-		return nil, apperrors.BadRequest("this supplier is inactive; reactivate it before raising new purchase documents", map[string]interface{}{"supplier_status": supplier.Status})
+		return "This supplier is inactive. Reactivate it to start a new order, bill or advance payment. " +
+			"Its open orders can still be received and its posted bills paid."
+	case "blocked":
+		return "This supplier is blocked. Unblock it to order, bill or receive goods, or to pay an advance. " +
+			"Its posted bills can still be paid."
 	default:
-		return nil, apperrors.BadRequest("this supplier cannot be used for purchasing", map[string]interface{}{"supplier_status": supplier.Status})
+		return "This supplier cannot be used for purchasing."
 	}
 }
 
-// dueDateFromTerms applies a supplier's payment terms to a bill date.
-//
-// The supplier form says payment terms "Sets the due date on bills from this
-// supplier." Nothing in purchasing read them: a Net 30 supplier's bill posted
-// as "Due Not recorded" on 2026-09-15, so it could never be overdue, and
-// payables ageing had nothing to age. payment_terms was referenced only by the
-// suppliers module itself.
-//
-// Prepaid is due on the bill date. No terms means no due date, as before.
-//
-// Regression: ISSUE-022 — supplier payment terms never set a bill's due date
-// Found by /qa on 2026-09-15
 // supplierPaymentUse decides whether a supplier payment is paying bills that
 // are already posted, or putting new money out.
 //
@@ -3483,6 +3484,18 @@ func supplierPaymentUse(req CreateSupplierPaymentRequest) supplierUse {
 	return supplierUseNewDocument
 }
 
+// dueDateFromTerms applies a supplier's payment terms to a bill date.
+//
+// The supplier form says payment terms "Sets the due date on bills from this
+// supplier." Nothing in purchasing read them: a Net 30 supplier's bill posted
+// as "Due Not recorded" on 2026-09-15, so it could never be overdue, and
+// payables ageing had nothing to age. payment_terms was referenced only by the
+// suppliers module itself.
+//
+// Prepaid is due on the bill date. No terms means no due date, as before.
+//
+// Regression: ISSUE-022 — supplier payment terms never set a bill's due date
+// Found by /qa on 2026-09-15
 func dueDateFromTerms(billDate time.Time, terms string) *time.Time {
 	days := map[string]int{"net_7": 7, "net_15": 15, "net_30": 30, "net_45": 45, "net_60": 60, "net_90": 90}
 	switch {

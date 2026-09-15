@@ -743,8 +743,15 @@ export function PurchaseOrderFormDialog({
                           />
                         </div>
                         {lockReason ? <FieldHint>{lockReason}</FieldHint> : null}
-                        {suppliers.every((supplier) => supplier.status !== "active") ? (
-                          <FieldHint>No suppliers available — add a supplier first.</FieldHint>
+                        {suppliers.length === 0 ? (
+                          <FieldHint>No suppliers yet. Add a supplier first.</FieldHint>
+                        ) : suppliers.every((supplier) => supplier.status !== "active") ? (
+                          // Every supplier is inactive or blocked. "Add a supplier first"
+                          // sent the owner of QA Flour Co to create a duplicate.
+                          <FieldHint>
+                            No active suppliers. Reactivate one on the Suppliers page, or add a new
+                            one.
+                          </FieldHint>
                         ) : null}
                         <FieldError message={supplierFieldError} />
                       </div>
