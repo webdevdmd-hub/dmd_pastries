@@ -322,3 +322,39 @@ func parseDateRange(fromValue, toValue string, now time.Time) (time.Time, time.T
 	}
 	return from, to, nil
 }
+
+// NarrowsBeyondLedgerScope reports whether the filter narrows the operational
+// data by something the ledger cannot see.
+//
+// Ledger totals are scoped by branch and date and nothing else: a journal line
+// does not know which payment method, order status, source document type,
+// customer or product it came from. The operational cross-checks DO apply those
+// filters. So under any of them the two figures answer different questions, and
+// a difference between them is not drift.
+//
+// Measured on 2026-09-15: filtering Financial Reports by Card sent
+// payment_method_id to the operational queries and nothing to the ledger, so
+// the page raised "gross_sales differs between the ledger (2118.00) and the
+// operational tables (0.00)" and the same for collected -- telling the operator
+// to run a backfill over a filter they had just applied.
+//
+// That filter was unusable until ISSUE-016 replaced its UUID box with a picker,
+// which is why nobody had seen this.
+//
+// Regression: ISSUE-018 — applying a report filter raised false ledger drift
+// Found by /qa on 2026-09-15
+func (f *ResolvedFilter) NarrowsBeyondLedgerScope() bool {
+	if f == nil {
+		return false
+	}
+	for _, value := range []string{
+		f.CashierUserID, f.CustomerID, f.ProductID, f.RecipeID, f.CategoryID,
+		f.BatchStatus, f.OrderStatus, f.OrderType, f.PaymentMethodID, f.PaymentStatus,
+		f.SaleStatus, f.RefundStatus, f.SourceType, f.ItemType, f.Status,
+	} {
+		if value != "" && value != "all" {
+			return true
+		}
+	}
+	return false
+}

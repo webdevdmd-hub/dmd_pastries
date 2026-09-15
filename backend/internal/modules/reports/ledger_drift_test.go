@@ -7,7 +7,7 @@ import (
 )
 
 func TestLedgerDriftWarningsSilentWhenSourcesAgree(t *testing.T) {
-	warnings := ledgerDriftWarnings([]ledgerDriftCheck{
+	warnings := ledgerDriftWarnings(nil, []ledgerDriftCheck{
 		{Metric: "gross_sales", Ledger: 1000, Operational: 1000},
 		// Per-line rounding between two independent summations is not drift.
 		{Metric: "total_collected", Ledger: 500.02, Operational: 500},
@@ -18,7 +18,7 @@ func TestLedgerDriftWarningsSilentWhenSourcesAgree(t *testing.T) {
 }
 
 func TestLedgerDriftWarningsReportsRealDifference(t *testing.T) {
-	warnings := ledgerDriftWarnings([]ledgerDriftCheck{
+	warnings := ledgerDriftWarnings(nil, []ledgerDriftCheck{
 		{Metric: "gross_sales", Ledger: 900, Operational: 1000},
 	})
 	if len(warnings) != 1 {
@@ -36,7 +36,7 @@ func TestLedgerDriftWarningsReportsRealDifference(t *testing.T) {
 }
 
 func TestLedgerDriftWarningsFlagsDriftInBothDirections(t *testing.T) {
-	warnings := ledgerDriftWarnings([]ledgerDriftCheck{
+	warnings := ledgerDriftWarnings(nil, []ledgerDriftCheck{
 		{Metric: "ledger_high", Ledger: 1200, Operational: 1000},
 		{Metric: "ledger_low", Ledger: 800, Operational: 1000},
 	})

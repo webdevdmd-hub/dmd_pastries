@@ -3,6 +3,8 @@ package reports
 import (
 	"fmt"
 	"math"
+
+	"pastries-pos/internal/modules/reports/shared"
 )
 
 // Reports read the ledger (Phase 5 / W4, audit root cause RC1).
@@ -32,8 +34,20 @@ type ledgerDriftCheck struct {
 
 // ledgerDriftWarnings reports every metric where the ledger and the
 // operational tables disagree. An empty result means the two agree.
-func ledgerDriftWarnings(checks []ledgerDriftCheck) []ReportConsistencyWarning {
+//
+// The filter is a required argument, not an option, so that every one of the
+// call sites has to decide what it is comparing. There are five of them, and a
+// fix applied to one call site while the others kept the bug is the most
+// repeated failure of this audit. Making the compiler demand the filter is the
+// only guard that cannot be skipped.
+//
+// When the filter narrows by something the ledger cannot see, the two sides are
+// answering different questions and there is nothing to compare.
+func ledgerDriftWarnings(filter *shared.ResolvedFilter, checks []ledgerDriftCheck) []ReportConsistencyWarning {
 	warnings := make([]ReportConsistencyWarning, 0)
+	if filter.NarrowsBeyondLedgerScope() {
+		return warnings
+	}
 	for _, check := range checks {
 		difference := check.Ledger - check.Operational
 		if math.Abs(difference) <= ledgerDriftEpsilon {

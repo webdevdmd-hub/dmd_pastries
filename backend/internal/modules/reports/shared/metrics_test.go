@@ -6,14 +6,26 @@ import (
 	"testing"
 )
 
+// A snapshot of the exact lists, kept so a change to them is always deliberate.
+//
+// On its own a snapshot cannot tell a correct list from a stale one, and this
+// one proved it. It was last updated on 2026-07-09. pos_sale_payment and
+// bakery_order_advance_refund were introduced on 2026-08-13 by the unified
+// refund contract, and nobody added them here, so for five weeks this test
+// held the incomplete lists in place: any fix would have failed it. That is
+// ISSUE-017.
+//
+// Completeness is now asserted against accounting/refund_contract.go in
+// collection_sources_test.go. This snapshot only guards against accidental
+// edits; the contract test is what decides what belongs in the lists.
 func TestDashboardFinancialSourceLists(t *testing.T) {
 	if !reflect.DeepEqual(RevenueJournalSources, []string{"pos_sale", "bakery_order_revenue", "pos_sale_void", "sales_return"}) {
 		t.Fatalf("unexpected revenue journal sources: %#v", RevenueJournalSources)
 	}
-	if !reflect.DeepEqual(CollectionJournalSources, []string{"pos_sale", "bakery_order_payment"}) {
+	if !reflect.DeepEqual(CollectionJournalSources, []string{"pos_sale", "pos_sale_payment", "bakery_order_payment"}) {
 		t.Fatalf("unexpected collection journal sources: %#v", CollectionJournalSources)
 	}
-	if !reflect.DeepEqual(RefundJournalSources, []string{"sales_return", "pos_sale_refund"}) {
+	if !reflect.DeepEqual(RefundJournalSources, []string{"sales_return", "pos_sale_refund", "pos_sale_void", "bakery_order_refund", "bakery_order_advance_refund"}) {
 		t.Fatalf("unexpected refund journal sources: %#v", RefundJournalSources)
 	}
 }

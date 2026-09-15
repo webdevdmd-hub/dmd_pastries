@@ -2239,7 +2239,7 @@ func (r *Repository) FinancialSummary(filter *shared.ResolvedFilter) (*Financial
 	if err != nil {
 		return nil, err
 	}
-	warnings = append(warnings, ledgerDriftWarnings([]ledgerDriftCheck{
+	warnings = append(warnings, ledgerDriftWarnings(filter, []ledgerDriftCheck{
 		{Metric: "gross_sales", Ledger: ledger.GrossRevenue, Operational: roundMoney(grossSales)},
 		{Metric: "total_collected", Ledger: ledger.Collected, Operational: roundMoney(collected.TotalCollected)},
 		{Metric: "total_refunded", Ledger: ledger.Refunded, Operational: roundMoney(refunded.TotalRefunded)},
@@ -2363,7 +2363,7 @@ func (r *Repository) OutstandingBalancesHeader(filter *shared.ResolvedFilter) (R
 		return ReportBalanceHeader{}, nil, err
 	}
 	operational = roundMoney(operational + openings)
-	warnings := ledgerDriftWarnings([]ledgerDriftCheck{
+	warnings := ledgerDriftWarnings(filter, []ledgerDriftCheck{
 		{Metric: "outstanding_customer_balance", Ledger: ledger, Operational: operational},
 	})
 	return ReportBalanceHeader{LedgerBalance: ledger, OperationalBalance: operational}, warnings, nil
@@ -2393,7 +2393,7 @@ func (r *Repository) SupplierPayablesHeader(filter *shared.ResolvedFilter) (Repo
 		return ReportBalanceHeader{}, 0, nil, err
 	}
 	operational = roundMoney(operational + openings)
-	warnings := ledgerDriftWarnings([]ledgerDriftCheck{
+	warnings := ledgerDriftWarnings(filter, []ledgerDriftCheck{
 		{Metric: "supplier_payable_balance", Ledger: ledger, Operational: operational},
 	})
 	return ReportBalanceHeader{LedgerBalance: ledger, OperationalBalance: operational}, advances, warnings, nil
@@ -2569,7 +2569,7 @@ func (r *Repository) FinancialTrendFromLedger(filter *shared.ResolvedFilter) ([]
 		operationalRefunded += row.SalesCount
 	}
 
-	warnings := ledgerDriftWarnings([]ledgerDriftCheck{
+	warnings := ledgerDriftWarnings(filter, []ledgerDriftCheck{
 		{Metric: "trend_total_collected", Ledger: roundMoney(ledgerCollected), Operational: roundMoney(operationalCollected)},
 		{Metric: "trend_total_refunded", Ledger: roundMoney(ledgerRefunded), Operational: roundMoney(operationalRefunded)},
 	})
@@ -2718,7 +2718,7 @@ func (r *Repository) paymentsSummary(filter *shared.ResolvedFilter) (*PaymentsSu
 	if err != nil {
 		return nil, nil, err
 	}
-	warnings := ledgerDriftWarnings([]ledgerDriftCheck{
+	warnings := ledgerDriftWarnings(filter, []ledgerDriftCheck{
 		{Metric: "total_collected", Ledger: ledger.Collected, Operational: roundMoney(collected.TotalCollected)},
 		{Metric: "total_refunded", Ledger: ledger.Refunded, Operational: roundMoney(refunded.TotalRefunded)},
 	})
