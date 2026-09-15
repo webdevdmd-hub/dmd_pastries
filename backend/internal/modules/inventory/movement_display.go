@@ -33,8 +33,26 @@ func movementDescription(movement StockMovement, movementLabel, referenceLabel, 
 	case "purchase_in":
 		return "Purchased through GRN " + referenceLabel
 	case "sale_out":
+		// sale_out is shared: the POS consumes stock with it, and so does a
+		// bakery order on completion (bakeryorders.consumeInventoryForCompletion).
+		// Describing every one as a POS receipt misattributed bakery orders in
+		// the stock ledger -- "Sold through POS Receipt #ORD-000007", a receipt
+		// that does not exist -- so a stock count reconciled against the till
+		// would go looking for sales that never happened.
+		//
+		// Regression: ISSUE-019 — bakery order stock movements were labelled as POS sales
+		// Found by /qa on 2026-09-15
+		if movement.ReferenceType == "bakery_order" {
+			if strings.Contains(strings.ToLower(reason), "packaging") {
+				return "Packaging used by Bakery Order " + referenceLabel
+			}
+			return "Used by Bakery Order " + referenceLabel
+		}
 		return "Sold through POS Receipt " + referenceLabel
 	case "return_in":
+		if movement.ReferenceType == "bakery_order_cancelled" {
+			return "Restocked from cancelled Bakery Order " + referenceLabel
+		}
 		if movement.ReferenceType == "sale_void" {
 			return "Returned from voided POS Receipt " + referenceLabel
 		}
@@ -85,7 +103,13 @@ func movementTypeLabel(value string) string {
 	case "purchase_in":
 		return "Purchase / GRN"
 	case "sale_out":
-		return "POS Sale"
+		// Source-neutral on purpose: this label is chosen from the movement TYPE
+		// alone, and the type is shared by POS sales and bakery orders. The
+		// Movements summary groups by it, so "POS Sale - 5 - 5 moves" was
+		// counting two bakery orders as POS sales. The badges already said
+		// "Sale Out"; this now agrees with them. The row description names the
+		// real source.
+		return "Sale Out"
 	case "adjustment_in":
 		return "Stock Adjustment In"
 	case "adjustment_out":
@@ -93,7 +117,9 @@ func movementTypeLabel(value string) string {
 	case "wastage":
 		return "Wastage"
 	case "return_in":
-		return "Sales Return"
+		// Shared by sales returns, POS voids and bakery order cancellations, so
+		// "Sales Return" was wrong for two of the three. Matches the badges.
+		return "Return In"
 	case "transfer", "transfer_in", "transfer_out":
 		return "Stock Transfer"
 	case "production_in":
@@ -125,6 +151,9 @@ func sourceModuleLabel(referenceType, movementType string) string {
 		return "POS"
 	case "sales_return":
 		return "Sales Return"
+	case "bakery_order", "bakery_order_cancelled":
+		// Fell through to "Inventory", which named no source at all.
+		return "Bakery Orders"
 	case "production_batch":
 		return "Manufacturing"
 	case "stock_transfer":

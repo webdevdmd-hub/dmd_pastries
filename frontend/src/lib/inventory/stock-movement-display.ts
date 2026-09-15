@@ -15,14 +15,28 @@ export type StockMovementDisplaySource = {
   toStockLocationName: string | null;
 };
 
+/**
+ * Labels chosen from the movement TYPE alone.
+ *
+ * sale_out and return_in are shared across sources, so their labels must not
+ * name one. sale_out is used by POS sales AND by bakery orders on completion;
+ * return_in by sales returns, POS voids AND bakery order cancellations. This map
+ * said "POS Sale" and "Sales Return", and the Movements summary groups by type,
+ * so it read "POS Sale - 5 - 5 moves" while two of the five were bakery orders.
+ * The badges already said "Sale Out" and "Return In"; this now agrees with them,
+ * and the row description names the real source.
+ *
+ * Regression: ISSUE-019 — bakery order stock movements were labelled as POS sales
+ * Found by /qa on 2026-09-15
+ */
 export const STOCK_MOVEMENT_TYPE_LABELS: Record<StockMovementType, string> = {
   opening_stock: "Opening Stock",
   purchase_in: "Purchase / GRN",
-  sale_out: "POS Sale",
+  sale_out: "Sale Out",
   adjustment_in: "Stock Adjustment In",
   adjustment_out: "Stock Adjustment Out",
   wastage: "Wastage",
-  return_in: "Sales Return",
+  return_in: "Return In",
   transfer: "Stock Transfer",
   transfer_in: "Transfer In",
   transfer_out: "Transfer Out",
@@ -116,8 +130,18 @@ export function stockMovementDescription(movement: StockMovementDisplaySource): 
     case "purchase_in":
       return `Purchased through GRN ${reference}`;
     case "sale_out":
+      // Fallback only -- the backend description wins when present -- but it
+      // carried the same misattribution, so it gets the same branch.
+      if (movement.referenceType === "bakery_order") {
+        return movement.reason?.toLowerCase().includes("packaging")
+          ? `Packaging used by Bakery Order ${reference}`
+          : `Used by Bakery Order ${reference}`;
+      }
       return `Sold through POS Receipt ${reference}`;
     case "return_in":
+      if (movement.referenceType === "bakery_order_cancelled") {
+        return `Restocked from cancelled Bakery Order ${reference}`;
+      }
       if (movement.referenceType === "sale_void") {
         return `Returned from voided POS Receipt ${reference}`;
       }
