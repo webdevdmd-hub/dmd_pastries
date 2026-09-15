@@ -34,6 +34,10 @@ import {
   useUpdateSupplierStatus,
 } from "@/hooks/use-suppliers";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
+import {
+  getHistoryDeleteConflictMessage,
+  isHistoryDeleteConflict,
+} from "@/lib/api/delete-conflicts";
 import type {
   CreateSupplierPayload,
   Supplier,
@@ -165,7 +169,18 @@ export function SuppliersPageClient(): JSX.Element {
       }
       setPendingAction(null);
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      // The API client appends string detail fields to the message, so a
+      // history refusal rendered as "...Deactivate it instead.: supplier_has_history"
+      // -- the machine reason code shown to the operator. Products avoid it the
+      // same way: recognise the conflict and say it in plain words.
+      //
+      // Regression: ISSUE-020 follow-up — the delete refusal leaked its reason code
+      // Found by /qa on 2026-09-15
+      toast.error(
+        pendingAction.type === "delete" && isHistoryDeleteConflict(error)
+          ? getHistoryDeleteConflictMessage("supplier")
+          : getErrorMessage(error),
+      );
     }
   };
 

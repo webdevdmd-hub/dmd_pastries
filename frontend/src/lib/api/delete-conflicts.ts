@@ -1,6 +1,11 @@
 import { ApiError } from "@/lib/api/client";
 
-type DeletableCatalogEntity = "ingredient" | "packaging item" | "product" | "purchase order";
+type DeletableCatalogEntity =
+  | "ingredient"
+  | "packaging item"
+  | "product"
+  | "purchase order"
+  | "supplier";
 
 function getReason(error: ApiError): string | null {
   const reason = error.errorDetails?.reason;
@@ -26,6 +31,10 @@ export function isHistoryDeleteConflict(error: unknown): error is ApiError {
 export function getHistoryDeleteConflictMessage(entity: DeletableCatalogEntity): string {
   if (entity === "product") {
     return "This product has stock/sales history and cannot be deleted. Please deactivate or archive it instead.";
+  }
+
+  if (entity === "supplier") {
+    return "This supplier has purchase orders, bills, payments or other purchasing history, so it cannot be deleted. Deactivate it instead: its records stay.";
   }
 
   if (entity === "purchase order") {
