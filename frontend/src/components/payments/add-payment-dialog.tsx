@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useReceiptRecords } from "@/hooks/use-reports";
 import { type AddPaymentSchema, addPaymentSchema } from "@/lib/validators/payment.schema";
 import type { AddPaymentPayload } from "@/types/payment";
 import type { PaymentMethod } from "@/types/settings";
@@ -33,6 +34,17 @@ type AddPaymentDialogProps = {
   open: boolean;
   paymentMethods: PaymentMethod[];
 };
+
+function formatOutstanding(value: number): string {
+  return new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" }).format(value);
+}
+
+function last90Days(): { dateFrom: string; dateTo: string } {
+  const today = new Date();
+  const from = new Date(today);
+  from.setDate(from.getDate() - 90);
+  return { dateFrom: from.toISOString().slice(0, 10), dateTo: today.toISOString().slice(0, 10) };
+}
 
 export function AddPaymentDialog({
   isSubmitting,
@@ -52,6 +64,16 @@ export function AddPaymentDialog({
       notes: null,
     },
   });
+  // Only sales that still owe something can take another payment, which is
+  // what this dialog is for ("Add a remaining payment to a partial sale"), so
+  // the picker asks for exactly those rather than every sale ever rung.
+  const unsettledSalesQuery = useReceiptRecords(
+    { ...last90Days(), limit: 100, paymentStatus: "partial" },
+    open,
+  );
+  const unsettledSales = (unsettledSalesQuery.data ?? []).filter(
+    (sale) => sale.totalAmount - sale.paidAmount > 0,
+  );
   const selectedPaymentMethod = paymentMethods.find(
     (method) => method.id === form.watch("paymentMethodId"),
   );
@@ -99,9 +121,48 @@ export function AddPaymentDialog({
             void form.handleSubmit(submitForm)(event);
           }}
         >
+          {/* A picker, not a UUID box.
+              This asked for a raw "Sale ID" behind the placeholder
+              "sale_uuid_here" -- a developer stub that shipped. A sale's UUID
+              appears nowhere in the app (the screens show SALE-20260914-000001),
+              so the only write action on the Payments page could not be used by
+              the person it is for. It now lists the sales that actually owe
+              money, which is the entire population this dialog serves.
+
+              Regression: ISSUE-015 — Record payment demanded a sale UUID no operator can see
+              Found by /qa on 2026-09-15 */}
           <div className="grid gap-2">
-            <Label htmlFor="saleId">Sale ID</Label>
-            <Input id="saleId" {...form.register("saleId")} placeholder="sale_uuid_here" />
+            <Label htmlFor="add-payment-sale">Sale</Label>
+            <Controller
+              control={form.control}
+              name="saleId"
+              render={({ field }) => (
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <SelectTrigger id="add-payment-sale">
+                    <SelectValue
+                      placeholder={
+                        unsettledSalesQuery.isLoading ? "Loading sales…" : "Select a sale"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {unsettledSales.map((sale) => (
+                      <SelectItem key={sale.saleId} value={sale.saleId}>
+                        {`${sale.saleNumber} — ${sale.customerName || "Walk-in customer"} — ${formatOutstanding(
+                          sale.totalAmount - sale.paidAmount,
+                        )} outstanding`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            {!unsettledSalesQuery.isLoading && unsettledSales.length === 0 ? (
+              <p className="text-xs text-foreground-muted">
+                Every sale in the last 90 days is fully paid, so there is nothing to add a payment
+                to.
+              </p>
+            ) : null}
             <p className="text-xs text-danger-text">{form.formState.errors.saleId?.message}</p>
           </div>
           <div className="grid gap-2">

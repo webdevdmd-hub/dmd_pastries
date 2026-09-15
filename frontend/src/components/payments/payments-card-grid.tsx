@@ -12,7 +12,7 @@ import {
   paymentSourceLabel,
 } from "@/components/payments/payments-table";
 import { Card } from "@/components/ui/card";
-import { orderPaymentTypeLabel } from "@/lib/orders/payment-stage";
+import { paymentStageLabel } from "@/lib/orders/payment-stage";
 
 /**
  * The payments ledger as cards, for phones: a ten-column table has no honest
@@ -69,7 +69,7 @@ export function PaymentsCardGrid({
           <div className="flex flex-wrap items-center gap-2 px-4 py-3 text-cell">
             <PaymentMethodBadge methodName={payment.paymentMethodNameSnapshot} />
             <span className="capitalize text-foreground-muted">
-              {orderPaymentTypeLabel(payment.paymentType)}
+              {paymentStageLabel(payment.paymentType, payment.sourceType)}
             </span>
             <span className="ml-auto text-title font-medium tabular-nums">
               {formatPaymentMoney(payment.amount)}
