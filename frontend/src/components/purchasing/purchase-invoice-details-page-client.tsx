@@ -7,6 +7,7 @@ import type { JSX } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { useConfirm } from "@/components/app/confirm-provider";
 import { usePublishBreadcrumbLabel } from "@/components/layout/breadcrumb-label";
 import { AccessDeniedCard } from "@/components/purchasing/access-denied-card";
 import { PurchaseErrorState } from "@/components/purchasing/purchase-error-state";
@@ -44,6 +45,7 @@ import { usePermission } from "@/hooks/use-permission";
 import {
   useCancelPurchaseInvoice,
   useConvertPurchaseInvoiceToReceipt,
+  useDeletePurchaseInvoice,
   usePostPurchaseInvoice,
   usePurchaseInvoice,
   usePurchasingBranches,
@@ -180,6 +182,8 @@ export function PurchaseInvoiceDetailsPageClient({
   const convertMutation = useConvertPurchaseInvoiceToReceipt();
   const postMutation = usePostPurchaseInvoice();
   const cancelMutation = useCancelPurchaseInvoice();
+  const deleteMutation = useDeletePurchaseInvoice();
+  const confirm = useConfirm();
   const updateMutation = useUpdatePurchaseInvoice();
 
   const activeTab = parsePurchaseInvoiceDetailTab(searchParams.get("tab"));
@@ -218,9 +222,31 @@ export function PurchaseInvoiceDetailsPageClient({
   const canConvertInvoice = canConvert && invoice.status === "posted" && invoice.canReceiveStock;
   const canPostInvoice = canPost && invoice.status === "draft";
   const canCancelInvoice = canCancel && invoice.status === "posted";
+  const canDeleteInvoice = canCancel && invoice.status === "draft";
   const canEditInvoice = canEdit && invoice.status !== "cancelled";
   const billTitle = invoice.supplierBillNumber ?? invoice.invoiceNumber;
   const standing = billStanding(invoice);
+
+  const deleteDraft = async (): Promise<void> => {
+    const confirmed = await confirm({
+      cancelLabel: "Keep draft",
+      confirmLabel: "Delete draft",
+      consequence: `This permanently deletes draft bill ${invoice.invoiceNumber} from ${invoice.supplierName}. It cannot be undone.`,
+      detail: "A draft has posted nothing, so no payable, stock or accounting entry changes.",
+      title: "Delete this draft bill?",
+      tone: "danger",
+    });
+    if (!confirmed) {
+      return;
+    }
+    try {
+      await deleteMutation.mutateAsync(invoice.id);
+      toast.success("Draft bill deleted.");
+      router.push(ROUTES.purchasingInvoices);
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
+  };
 
   const openConvertDialog = (): void => {
     setReceivedDate(today());
@@ -340,7 +366,7 @@ export function PurchaseInvoiceDetailsPageClient({
                 Create receive goods
               </Button>
             ) : null}
-            {canEditInvoice || canCancelInvoice ? (
+            {canEditInvoice || canCancelInvoice || canDeleteInvoice ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -371,6 +397,14 @@ export function PurchaseInvoiceDetailsPageClient({
                       }}
                     >
                       Cancel bill
+                    </DropdownMenuItem>
+                  ) : null}
+                  {canDeleteInvoice ? (
+                    <DropdownMenuItem
+                      className="text-danger-text"
+                      onSelect={() => void deleteDraft()}
+                    >
+                      Delete draft
                     </DropdownMenuItem>
                   ) : null}
                 </DropdownMenuContent>

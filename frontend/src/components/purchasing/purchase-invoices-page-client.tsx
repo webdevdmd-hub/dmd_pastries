@@ -6,6 +6,7 @@ import type { JSX } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { useConfirm } from "@/components/app/confirm-provider";
 import { AccessDeniedCard } from "@/components/purchasing/access-denied-card";
 import { PurchaseEmptyState } from "@/components/purchasing/purchase-empty-state";
 import { PurchaseErrorState } from "@/components/purchasing/purchase-error-state";
@@ -41,6 +42,7 @@ import {
   useCancelPurchaseInvoice,
   useConvertPurchaseInvoiceToReceipt,
   useCreatePurchaseInvoice,
+  useDeletePurchaseInvoice,
   usePostPurchaseInvoice,
   usePurchaseInvoices,
   usePurchasingBranches,
@@ -158,6 +160,8 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
   const updateMutation = useUpdatePurchaseInvoice();
   const postMutation = usePostPurchaseInvoice();
   const cancelMutation = useCancelPurchaseInvoice();
+  const deleteMutation = useDeletePurchaseInvoice();
+  const confirm = useConfirm();
   const receiveMutation = useReceivePurchase();
   const convertMutation = useConvertPurchaseInvoiceToReceipt();
   const isPermissionDenied =
@@ -319,6 +323,27 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
     }
   };
 
+  const deleteDraft = async (invoice: PurchaseInvoice): Promise<void> => {
+    setDetailsOpen(false);
+    const confirmed = await confirm({
+      cancelLabel: "Keep draft",
+      confirmLabel: "Delete draft",
+      consequence: `This permanently deletes draft bill ${invoice.invoiceNumber} from ${invoice.supplierName}. It cannot be undone.`,
+      detail: "A draft has posted nothing, so no payable, stock or accounting entry changes.",
+      title: "Delete this draft bill?",
+      tone: "danger",
+    });
+    if (!confirmed) {
+      return;
+    }
+    try {
+      await deleteMutation.mutateAsync(invoice.id);
+      toast.success("Draft bill deleted.");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
+  };
+
   const invoices = invoicesQuery.data?.items ?? [];
   const listHandlers = {
     canConvertToReceipt,
@@ -328,6 +353,7 @@ export function PurchaseInvoicesPageClient(): JSX.Element {
     loadingInvoiceId: loadingInvoiceDetailId,
     onCancel: (invoice: PurchaseInvoice) => askAction({ invoice, type: "cancel" }),
     onConvertToReceipt: (invoice: PurchaseInvoice) => void handleConvertToReceipt(invoice),
+    onDelete: (invoice: PurchaseInvoice) => void deleteDraft(invoice),
     onEdit: (invoice: PurchaseInvoice) => void handleEditInvoice(invoice),
     onPost: (invoice: PurchaseInvoice) => askAction({ invoice, type: "post" }),
     onReceive: (invoice: PurchaseInvoice) => void handleOpenReceive(invoice),

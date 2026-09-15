@@ -19,6 +19,7 @@ import {
   createPurchaseOrderRevision,
   createPurchaseReturn,
   createSupplierPayment,
+  deletePurchaseInvoice,
   deletePurchaseOrder,
   deleteSupplierPayment,
   duplicatePurchaseOrder,
@@ -594,6 +595,17 @@ export function useCancelPurchaseInvoice() {
       },
     },
   );
+}
+
+export function useDeletePurchaseInvoice() {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, string>({
+    mutationFn: async (id) => deletePurchaseInvoice(id),
+    onSuccess: async () => {
+      await invalidatePurchasing(queryClient);
+    },
+  });
 }
 
 export function useConvertPurchaseInvoiceToReceipt() {

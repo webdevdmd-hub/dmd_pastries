@@ -390,6 +390,43 @@ func (r *Repository) HardDeleteOrder(tx *gorm.DB, businessID, orderID string) er
 		Delete(&PurchaseOrder{}))
 }
 
+// invoiceReferenceTables lists every table with a foreign key to
+// purchase_invoices other than the bill's own items. Deleting a bill that any
+// of these point at would orphan that history.
+var invoiceReferenceTables = []string{
+	"purchase_invoice_payments",
+	"supplier_payment_allocations",
+	"purchase_receipts",
+	"purchase_returns",
+}
+
+func (r *Repository) InvoiceReferenceCount(tx *gorm.DB, businessID, invoiceID string) (int64, error) {
+	var total int64
+	for _, table := range invoiceReferenceTables {
+		var count int64
+		if err := tx.Table(table).Where("business_id = ? AND purchase_invoice_id = ?", businessID, invoiceID).Count(&count).Error; err != nil {
+			return 0, err
+		}
+		total += count
+	}
+	return total, nil
+}
+
+// HardDeleteDraftInvoice removes a draft bill with its charges and items. The
+// status guard is repeated in the delete itself so a bill posted between the
+// check and the delete is never removed.
+func (r *Repository) HardDeleteDraftInvoice(tx *gorm.DB, businessID, invoiceID string) error {
+	if err := r.hardDeleteDocumentChargesForIDs(tx, businessID, "purchase_invoice", []string{invoiceID}); err != nil {
+		return err
+	}
+	if err := tx.Unscoped().Where("purchase_invoice_id = ? AND business_id = ?", invoiceID, businessID).Delete(&PurchaseInvoiceItem{}).Error; err != nil {
+		return err
+	}
+	return updateOne(tx.Unscoped().
+		Where("id = ? AND business_id = ? AND status = ?", invoiceID, businessID, "draft").
+		Delete(&PurchaseInvoice{}))
+}
+
 func (r *Repository) purchaseOrderDraftInvoiceIDs(tx *gorm.DB, businessID, orderID string) ([]string, error) {
 	var ids []string
 	err := tx.Model(&PurchaseInvoice{}).

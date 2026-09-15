@@ -1723,6 +1723,18 @@ export async function postPurchaseInvoice(id: string): Promise<PurchaseInvoice> 
   return response.data;
 }
 
+/**
+ * Discards a draft bill. The server refuses to cancel a draft ("should be
+ * deleted, not cancelled") and refuses to delete anything but a draft.
+ */
+export async function deletePurchaseInvoice(id: string): Promise<void> {
+  await apiRequest<void>(`/api/v1/purchasing/invoices/${id}`, {
+    method: "DELETE",
+    authMode: "appwrite",
+    parse: () => undefined,
+  });
+}
+
 export async function cancelPurchaseInvoice(
   id: string,
   payload: CancelPurchaseInvoicePayload,

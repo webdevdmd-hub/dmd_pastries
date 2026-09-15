@@ -1692,6 +1692,43 @@ func (s *Service) ensurePostedInvoiceCanBeEdited(tx *gorm.DB, businessID, invoic
 	return nil
 }
 
+// DeleteInvoice discards a draft bill.
+//
+// CancelInvoice refuses drafts ("draft purchase invoices should be deleted, not
+// cancelled"), but nothing could delete one: there was no route, no service
+// method and no menu item. A draft bill entered by mistake stayed forever, and
+// one converted from a purchase order kept that order from being billed again,
+// because ActiveInvoiceCountForOrder counts drafts.
+//
+// A draft has posted nothing -- no payable, no journal, no stock -- so it is
+// removed outright, the same way DeleteOrder removes a draft order's drafts.
+// Anything that already points at the bill refuses the delete instead.
+func (s *Service) DeleteInvoice(currentUser *utils.AuthContext, id, ipAddress, userAgent string) error {
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		invoice, err := s.repo.FindInvoiceForUpdate(tx, id, currentUser.BusinessID)
+		if err != nil {
+			return notFound(err, "purchase invoice not found")
+		}
+		if err := currentUser.EnsureRecordBranch(invoice.BranchID); err != nil {
+			return err
+		}
+		if invoice.Status != "draft" {
+			return apperrors.Conflict("only draft bills can be deleted; cancel a posted bill instead", map[string]interface{}{"reason": "purchase_invoice_not_draft"})
+		}
+		references, err := s.repo.InvoiceReferenceCount(tx, currentUser.BusinessID, invoice.ID)
+		if err != nil {
+			return err
+		}
+		if references > 0 {
+			return apperrors.Conflict("this draft bill is referenced by payments, receipts or returns and cannot be deleted", map[string]interface{}{"reason": "purchase_invoice_has_history"})
+		}
+		if err := s.repo.HardDeleteDraftInvoice(tx, currentUser.BusinessID, invoice.ID); err != nil {
+			return err
+		}
+		return s.audit(tx, currentUser, "purchase_invoice.hard_deleted", invoice.ID, "Draft purchase invoice "+invoice.InvoiceNumber+" deleted", ipAddress, userAgent)
+	})
+}
+
 func (s *Service) PostInvoice(currentUser *utils.AuthContext, id, ipAddress, userAgent string) (*PurchaseInvoiceResponse, error) {
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		invoice, err := s.repo.FindInvoiceForUpdate(tx, id, currentUser.BusinessID)

@@ -19,6 +19,7 @@ export type PurchaseInvoiceActionHandlers = {
   canPost: boolean;
   onCancel: (invoice: PurchaseInvoice) => void;
   onConvertToReceipt: (invoice: PurchaseInvoice) => void;
+  onDelete: (invoice: PurchaseInvoice) => void;
   onEdit: (invoice: PurchaseInvoice) => void;
   onPost: (invoice: PurchaseInvoice) => void;
   onReceive: (invoice: PurchaseInvoice) => void;
@@ -36,6 +37,7 @@ export function PurchaseInvoiceActionsMenu({
   isLoading,
   onCancel,
   onConvertToReceipt,
+  onDelete,
   onEdit,
   onPost,
   onReceive,
@@ -106,6 +108,17 @@ export function PurchaseInvoiceActionsMenu({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="text-danger-text" onSelect={() => onCancel(invoice)}>
                   Cancel bill
+                </DropdownMenuItem>
+              </>
+            ) : null}
+            {/* A draft has posted nothing, so it is deleted rather than
+                cancelled; the server refuses to cancel one. Without this a
+                draft entered by mistake could never be removed. */}
+            {invoice.status === "draft" ? (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-danger-text" onSelect={() => onDelete(invoice)}>
+                  Delete draft
                 </DropdownMenuItem>
               </>
             ) : null}
