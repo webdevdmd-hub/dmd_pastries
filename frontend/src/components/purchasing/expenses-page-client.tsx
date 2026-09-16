@@ -48,6 +48,7 @@ import {
 import { usePermission } from "@/hooks/use-permission";
 import { usePurchasingBranches, usePurchasingSuppliers } from "@/hooks/use-purchasing";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
+import { initialExpenseBranchId, isRecordableBranchId } from "@/lib/purchasing/expense-form";
 import { supplierOptionsFor, supplierStatusNote } from "@/lib/purchasing/supplier-use";
 import { isLedgerAllowedForContext, isPaymentAccountForBranch } from "@/lib/selectors/eligibility";
 import { uploadFile } from "@/lib/storage/files";
@@ -223,6 +224,11 @@ function customerOptions(customers: Customer[]): SearchableComboboxOption[] {
   }));
 }
 
+/** AED, as the expense list shows it. Names the amount in the delete confirmation. */
+function formatExpenseAmount(value: number): string {
+  return new Intl.NumberFormat("en-AE", { currency: "AED", style: "currency" }).format(value);
+}
+
 function buildPayload(state: ExpenseFormState): CreateExpensePayload {
   return {
     amount: Number(state.amount),
@@ -295,6 +301,12 @@ function ExpenseFormDialog({
 }): JSX.Element {
   const [formState, setFormState] = useState<ExpenseFormState>(emptyForm(defaultBranchId));
   const [error, setError] = useState<string | null>(null);
+  // Set by a submit that failed validation. From then on the message and the
+  // tab badges follow the fields: they used to stay exactly as the failed
+  // submit left them, so a fully corrected form still read "Expense account is
+  // required. Paid through account is required. Amount must be greater than
+  // zero." with an "Expense 3" badge until the next click. (ISSUE-037)
+  const [validationShown, setValidationShown] = useState(false);
   const [activeTab, setActiveTab] = useState<ExpenseFormTabKey>("expense");
   const [tabErrorCounts, setTabErrorCounts] = useState<Record<ExpenseFormTabKey, number>>({
     attribution: 0,
@@ -315,8 +327,13 @@ function ExpenseFormDialog({
     () => paidThroughOptions(paymentAccounts, formState.branchId),
     [formState.branchId, paymentAccounts],
   );
+  // Only a real branch can lack payment accounts. With no branch chosen the
+  // list is empty because nothing is selected, not because setup is missing.
   const hasNoPaidThroughOptions =
-    !isAccountLoading && !accountErrorMessage && paidThroughAccountOptions.length === 0;
+    isRecordableBranchId(formState.branchId) &&
+    !isAccountLoading &&
+    !accountErrorMessage &&
+    paidThroughAccountOptions.length === 0;
   const supplierComboboxOptions = useMemo(
     () => supplierOptions(suppliers, formState.supplierId),
     [formState.supplierId, suppliers],
@@ -327,6 +344,7 @@ function ExpenseFormDialog({
     if (open) {
       setFormState(formFromExpense(expense, defaultBranchId));
       setError(null);
+      setValidationShown(false);
       setActiveTab("expense");
       setTabErrorCounts({ attribution: 0, expense: 0, receipt: 0 });
       setCustomerSearch("");
@@ -420,7 +438,7 @@ function ExpenseFormDialog({
   ): { fieldId: string; message: string }[] => {
     const found: { fieldId: string; message: string }[] = [];
 
-    if (!payload.branchId) {
+    if (!isRecordableBranchId(payload.branchId)) {
       found.push({ fieldId: "expenses-branch", message: "Branch is required." });
     }
 
@@ -453,26 +471,44 @@ function ExpenseFormDialog({
     return found;
   };
 
+  /** The message and per-tab badges for a set of failing fields. */
+  const showValidation = (validationErrors: { fieldId: string; message: string }[]): void => {
+    setError(
+      validationErrors.length > 0 ? validationErrors.map((item) => item.message).join(" ") : null,
+    );
+
+    // Badge each tab with how many of its fields are failing, so a problem
+    // on a tab the operator is not looking at is still visible.
+    const counts: Record<ExpenseFormTabKey, number> = {
+      attribution: 0,
+      expense: 0,
+      receipt: 0,
+    };
+    validationErrors.forEach((item) => {
+      const tab = EXPENSE_FIELD_TABS[item.fieldId] ?? "expense";
+      counts[tab] += 1;
+    });
+    setTabErrorCounts(counts);
+  };
+
+  // After a failed submit, re-check on every change: a fixed field drops out of
+  // the message and its badge at once. Focus and tab stay where the operator
+  // put them; only a submit moves them.
+  useEffect(() => {
+    if (!open || !validationShown) return;
+    showValidation(collectValidationErrors(buildPayload(formState)));
+    // showValidation and collectValidationErrors read only the values below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formState, open, paidThroughAccountOptions, validationShown]);
+
   const submitForm = async (): Promise<void> => {
     const payload = buildPayload(formState);
 
     const validationErrors = collectValidationErrors(payload);
 
     if (validationErrors.length > 0) {
-      setError(validationErrors.map((item) => item.message).join(" "));
-
-      // Badge each tab with how many of its fields are failing, so a problem
-      // on a tab the operator is not looking at is still visible.
-      const counts: Record<ExpenseFormTabKey, number> = {
-        attribution: 0,
-        expense: 0,
-        receipt: 0,
-      };
-      validationErrors.forEach((item) => {
-        const tab = EXPENSE_FIELD_TABS[item.fieldId] ?? "expense";
-        counts[tab] += 1;
-      });
-      setTabErrorCounts(counts);
+      showValidation(validationErrors);
+      setValidationShown(true);
 
       // Switch to the tab holding the first offender before focusing it:
       // focusing a field on a hidden tab moves the caret nowhere visible.
@@ -486,6 +522,7 @@ function ExpenseFormDialog({
     }
 
     setError(null);
+    setValidationShown(false);
     setTabErrorCounts({ attribution: 0, expense: 0, receipt: 0 });
 
     if (receiptFile) {
@@ -1062,7 +1099,7 @@ export function ExpensesPageClient({
       <ExpenseFormDialog
         accountErrorMessage={accountErrorMessage}
         branches={branchOptions}
-        defaultBranchId={branchScope.defaultBranchId}
+        defaultBranchId={initialExpenseBranchId(branchScope.defaultBranchId, branchOptions)}
         expense={editingExpense}
         expenseAccounts={expenseAccountList}
         isAccountLoading={isAccountLoading}
@@ -1090,8 +1127,9 @@ export function ExpensesPageClient({
           <DialogHeader>
             <DialogTitle>Delete expense permanently?</DialogTitle>
             <DialogDescription>
-              This removes the expense and backend-generated journal entries. This action cannot be
-              undone.
+              {deleteTarget
+                ? `This permanently deletes ${deleteTarget.expenseNumber}, ${formatExpenseAmount(deleteTarget.amount)} of ${deleteTarget.expenseAccountName}, and removes its journal entries from the ledger. It cannot be undone.`
+                : "This permanently deletes the expense and its journal entries. It cannot be undone."}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

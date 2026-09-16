@@ -31,5 +31,5 @@ func handleError(c *gin.Context, err error) {
 		return
 	}
 
-	response.Error(c, 500, "internal server error", err.Error())
+	response.InternalError(c, err)
 }

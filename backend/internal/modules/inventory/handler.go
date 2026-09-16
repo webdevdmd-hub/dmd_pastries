@@ -546,7 +546,7 @@ func handleError(c *gin.Context, err error) {
 		response.Error(c, appErr.StatusCode, appErr.Message, appErr.Details)
 		return
 	}
-	response.Error(c, 500, "internal server error", err.Error())
+	response.InternalError(c, err)
 }
 
 func (h *Handler) PickerInventory(c *gin.Context) {

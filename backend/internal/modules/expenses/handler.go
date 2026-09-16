@@ -117,5 +117,5 @@ func handleError(c *gin.Context, err error) {
 		response.Error(c, appErr.StatusCode, appErr.Message, appErr.Details)
 		return
 	}
-	response.Error(c, 500, err.Error(), nil)
+	response.InternalError(c, err)
 }

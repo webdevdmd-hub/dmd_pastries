@@ -49,6 +49,7 @@
     "test:order-next-step": "node scripts/check-order-next-step.mjs",
     "test:order-status-rules": "node scripts/check-order-status-rules.mjs",
     "test:error-message-details": "node scripts/check-error-message-details.mjs",
+    "test:expense-form": "node scripts/check-expense-form.mjs",
     "test:movement-type-labels": "node scripts/check-movement-type-labels.mjs",
     "test:bill-action-gates": "node scripts/check-bill-action-gates.mjs",
     "test:draft-bill-delete": "node scripts/check-draft-bill-delete.mjs",
