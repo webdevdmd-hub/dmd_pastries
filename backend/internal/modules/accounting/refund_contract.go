@@ -49,6 +49,8 @@ const (
 	SourcePurchaseReturnReversal     = "purchase_return_reversal"
 	SourceManufacturingBatch         = "manufacturing_batch"
 	SourceExpense                    = "expense"
+	SourceExpenseEdit                = "expense_edit"
+	SourceExpenseUpdateReversal      = "expense_update_reversal"
 	SourceStockMovement              = "stock_movement"
 	SourceInventoryOpeningStock      = "inventory_opening_stock"
 	SourceInventoryAdjustment        = "inventory_adjustment"
@@ -103,7 +105,9 @@ var reversalContracts = map[string]ReversalContract{
 	SourcePurchaseReturnReversal:     {Rationale: "is itself the mirror reversal of purchase_return"},
 
 	SourceManufacturingBatch:    {Rationale: "batches are corrected operationally (wastage/adjustment movements), which post their own journals"},
-	SourceExpense:               {Rationale: "expenses are corrected with a manual journal reversal (journal_reversal)"},
+	SourceExpense:               {ReversedBy: SourceExpenseUpdateReversal},
+	SourceExpenseEdit:           {ReversedBy: SourceExpenseUpdateReversal},
+	SourceExpenseUpdateReversal: {Rationale: "is itself the reversal step of an expense edit"},
 	SourceStockMovement:         {Rationale: "movements reverse through mirror movements (is_reversal) whose journals post via the same movement pipeline"},
 	SourceInventoryOpeningStock: {Rationale: "opening balances are corrected by adjustment movements, not reversed"},
 	SourceInventoryAdjustment:   {Rationale: "an adjustment is undone by a counter-adjustment movement"},

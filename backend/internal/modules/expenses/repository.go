@@ -283,16 +283,42 @@ func (r *Repository) MarkJournalReversed(tx *gorm.DB, businessID, entryID, rever
 	return nil
 }
 
+// expenseJournalSourceTypes are every source type an expense's journals carry.
+var expenseJournalSourceTypes = []string{
+	accounting.SourceExpense,
+	accounting.SourceExpenseEdit,
+	accounting.SourceExpenseUpdateReversal,
+	"expense_void_reversal",
+}
+
+// ListExpenseJournalEntryIDs returns every journal an expense has had.
+//
+// Only the first journal is keyed to the expense. Each reversal is keyed to the
+// journal it reverses, and each edit's replacement to the journal it replaces,
+// so the rest are found by following source ids outward from the expense.
+// Missing one would leave its amount in the ledger after the expense is deleted.
 func (r *Repository) ListExpenseJournalEntryIDs(tx *gorm.DB, businessID, expenseID string) ([]string, error) {
-	var ids []string
-	err := tx.Model(&accounting.JournalEntry{}).
-		Where("business_id = ? AND source_id = ? AND source_type IN ?",
-			businessID,
-			expenseID,
-			[]string{"expense", "expense_update_reversal", "expense_void_reversal"},
-		).
-		Pluck("id", &ids).Error
-	return ids, err
+	var all []string
+	seen := map[string]bool{}
+	frontier := []string{expenseID}
+	for len(frontier) > 0 {
+		var ids []string
+		if err := tx.Model(&accounting.JournalEntry{}).
+			Where("business_id = ? AND source_id IN ? AND source_type IN ?", businessID, frontier, expenseJournalSourceTypes).
+			Pluck("id", &ids).Error; err != nil {
+			return nil, err
+		}
+		frontier = frontier[:0]
+		for _, id := range ids {
+			if seen[id] {
+				continue
+			}
+			seen[id] = true
+			all = append(all, id)
+			frontier = append(frontier, id)
+		}
+	}
+	return all, nil
 }
 
 func (r *Repository) SoftDeleteExpense(tx *gorm.DB, businessID, id string) error {

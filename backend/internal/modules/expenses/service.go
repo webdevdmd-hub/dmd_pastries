@@ -106,7 +106,7 @@ func (s *Service) Create(currentUser *utils.AuthContext, req CreateExpenseReques
 		if err := s.repo.Create(tx, &created); err != nil {
 			return err
 		}
-		entryID, err := s.postExpenseJournal(tx, currentUser, created, "expense", nil)
+		entryID, err := s.postExpenseJournal(tx, currentUser, created, accounting.SourceExpense, created.ID, nil)
 		if err != nil {
 			return err
 		}
@@ -209,7 +209,7 @@ func (s *Service) Update(currentUser *utils.AuthContext, id string, req UpdateEx
 		}
 		plan := expenseJournalPlan(accountingChanged, journalLive)
 		if plan.ReverseCurrent {
-			reversalID, err := s.postReversalJournal(tx, currentUser, *existing, "expense_update_reversal")
+			reversalID, err := s.postReversalJournal(tx, currentUser, *existing, accounting.SourceExpenseUpdateReversal)
 			if err != nil {
 				return err
 			}
@@ -217,7 +217,8 @@ func (s *Service) Update(currentUser *utils.AuthContext, id string, req UpdateEx
 			updates["reversal_journal_entry_id"] = reversalID
 		}
 		if plan.PostNew {
-			newEntryID, err := s.postExpenseJournal(tx, currentUser, updated, "expense", nil)
+			sourceType, sourceID := expenseReplacementSource(*existing)
+			newEntryID, err := s.postExpenseJournal(tx, currentUser, updated, sourceType, sourceID, nil)
 			if err != nil {
 				return err
 			}
@@ -298,6 +299,25 @@ func (s *Service) Delete(currentUser *utils.AuthContext, id string, ipAddress, u
 			UserAgent: userAgent,
 		})
 	})
+}
+
+// expenseReplacementSource keys the journal an edit posts.
+//
+// The first journal is (expense, expense id). A replacement cannot reuse that:
+// the index on journal_entries allows one journal per (source type, source id)
+// among posted AND reversed ones, so it collides with the journal it replaces.
+// That collision is why the lookup used to hand back the reversed journal
+// (ISSUE-035), and why the first fix for it returned a 500 on production.
+//
+// So a replacement is (expense_edit, id of the journal it replaces). Each
+// journal is replaced at most once, so the key is unique, and the chain from
+// the expense id reaches every journal the expense ever had -- which is how
+// Delete still finds them all.
+func expenseReplacementSource(existing Expense) (string, string) {
+	if existing.JournalEntryID == nil || *existing.JournalEntryID == "" {
+		return accounting.SourceExpense, existing.ID
+	}
+	return accounting.SourceExpenseEdit, *existing.JournalEntryID
 }
 
 type journalPlan struct {
@@ -512,7 +532,7 @@ func (s *Service) validateExpenseInput(tx *gorm.DB, businessID, branchID, expens
 	return nil
 }
 
-func (s *Service) postExpenseJournal(tx *gorm.DB, currentUser *utils.AuthContext, expense Expense, sourceType string, reversedEntryID *string) (string, error) {
+func (s *Service) postExpenseJournal(tx *gorm.DB, currentUser *utils.AuthContext, expense Expense, sourceType, sourceID string, reversedEntryID *string) (string, error) {
 	// This path builds its lines by hand rather than going through the shared
 	// builder, so the guards that builder applies are applied here instead.
 	branchID := strings.TrimSpace(expense.BranchID)
@@ -528,7 +548,7 @@ func (s *Service) postExpenseJournal(tx *gorm.DB, currentUser *utils.AuthContext
 	// value is exact at this point, and NUMERIC(14,2) fits float64 without
 	// losing cents, so the hand-off is lossless.
 	amountFloat := amount.Float64()
-	if existing, err := s.repo.FindPostedJournalBySource(tx, expense.BusinessID, sourceType, expense.ID); err == nil && existing.ID != "" {
+	if existing, err := s.repo.FindPostedJournalBySource(tx, expense.BusinessID, sourceType, sourceID); err == nil && existing.ID != "" {
 		return existing.ID, nil
 	} else if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return "", err
@@ -542,7 +562,6 @@ func (s *Service) postExpenseJournal(tx *gorm.DB, currentUser *utils.AuthContext
 		return "", err
 	}
 	now := time.Now().UTC()
-	sourceID := expense.ID
 	entry := accounting.JournalEntry{
 		ID:              utils.NewUUID(),
 		BusinessID:      expense.BusinessID,
@@ -626,7 +645,12 @@ func (s *Service) postReversalJournal(tx *gorm.DB, currentUser *utils.AuthContex
 		return "", err
 	}
 	now := time.Now().UTC()
-	sourceID := expense.ID
+	// Keyed to the journal it reverses, not to the expense. The journal index
+	// allows one journal per (source type, source id), counting reversed ones,
+	// so a reversal keyed to the expense could happen once per expense -- and a
+	// second edit would fail on a duplicate key. The accounting module's own
+	// reversals key the same way.
+	sourceID := *expense.JournalEntryID
 	branchID := strings.TrimSpace(expense.BranchID)
 	if branchID == "" {
 		return "", apperrors.Internal("expense reversal requires a branch")
