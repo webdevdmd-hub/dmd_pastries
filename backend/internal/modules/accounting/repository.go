@@ -356,8 +356,13 @@ type documentChargeAccountingRow struct {
 	TotalAmount float64
 }
 
+// Create writes every column. ChartAccount.AllowManualPosting carries
+// gorm:"default:true", and a plain Create treats a false bool as "not set" and
+// leaves it out of the INSERT, so the database default TRUE won: an account
+// created with "Allow manual posting" unchecked was saved as allowing it.
+// Select("*") includes zero values. (ISSUE-039)
 func (r *Repository) Create(tx *gorm.DB, account *ChartAccount) error {
-	return tx.Create(account).Error
+	return tx.Select("*").Create(account).Error
 }
 
 func (r *Repository) CreateJournalEntry(tx *gorm.DB, entry *JournalEntry, lines []JournalEntryLine) error {

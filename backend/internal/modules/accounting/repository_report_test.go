@@ -46,8 +46,12 @@ func TestDefaultInventoryStockAccountIsReportableControlAccount(t *testing.T) {
 		if !seed.IsControlAccount {
 			t.Fatal("inventory stock account must remain a control account")
 		}
-		if seed.AllowManualPosting {
-			t.Fatal("inventory stock account must not allow manual posting")
+		// Owner decision, 2026-09-16 (ISSUE-039): only the automatic cost-of-sales
+		// accounts and Card Clearing are locked. Inventory / Stock was seeded as
+		// locked but never was in practice, and locking it was deferred to a
+		// review with the accountant, so it stays open to manual journals.
+		if !seed.AllowManualPosting {
+			t.Fatal("inventory stock account stays open to manual posting until the owner decides otherwise")
 		}
 	}
 	if !found {

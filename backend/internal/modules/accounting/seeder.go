@@ -26,6 +26,18 @@ type defaultAccountSeed struct {
 	IsHeader bool
 }
 
+// Manual posting locks (ISSUE-039, owner decision 2026-09-16).
+//
+// Until that fix no seed was locked in practice: GORM dropped false in favour of
+// the column default. The owner then chose to lock the accounts the app posts to
+// by itself -- 1030 Card Clearing and the cost-of-sales automatics 5000, 5010,
+// 5020, 5050, 5070, 5080, 5090 -- and to add 5095 for hand corrections.
+//
+// The seed originally marked 20 more as locked (receivables, payables,
+// inventory, VAT, advances, equity, sales income). They have never been locked
+// on any business, and locking them was not part of that decision, so they stay
+// open here too; new businesses behave like existing ones. Locking them is a
+// separate decision.
 func DefaultChartAccountSeeds() []defaultAccountSeed {
 	return []defaultAccountSeed{
 		// Header rows: grouping only, never posted to.
@@ -44,11 +56,11 @@ func DefaultChartAccountSeeds() []defaultAccountSeed {
 		{Code: "1010", Name: "Bank Account", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: true, Parent: "10"},
 		{Code: "1020", Name: "Petty Cash", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: true, Parent: "10"},
 		{Code: "1030", Name: "Card Clearing Account", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false, Parent: "10"},
-		{Code: "1100", Name: "Accounts Receivable", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false, Parent: "10"},
-		{Code: "1200", Name: "Inventory / Stock", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false, Parent: "10"},
-		{Code: "1210", Name: "Work in Process Inventory", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false, Parent: "10"},
-		{Code: "1300", Name: "VAT Receivable", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false, Parent: "10"},
-		{Code: "1400", Name: "Supplier Advances / Vendor Prepayments", Type: "asset", Group: "current_asset", NormalBalance: "debit", Description: "Unapplied supplier payments and vendor prepayments", IsControlAccount: true, AllowManualPosting: false, Parent: "10"},
+		{Code: "1100", Name: "Accounts Receivable", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: true, Parent: "10"},
+		{Code: "1200", Name: "Inventory / Stock", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: true, Parent: "10"},
+		{Code: "1210", Name: "Work in Process Inventory", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: true, Parent: "10"},
+		{Code: "1300", Name: "VAT Receivable", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: true, Parent: "10"},
+		{Code: "1400", Name: "Supplier Advances / Vendor Prepayments", Type: "asset", Group: "current_asset", NormalBalance: "debit", Description: "Unapplied supplier payments and vendor prepayments", IsControlAccount: true, AllowManualPosting: true, Parent: "10"},
 		{Code: "1500", Name: "Prepaid Expenses", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true, Parent: "10"},
 		{Code: "1600", Name: "Security Deposit", Type: "asset", Group: "current_asset", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true, Parent: "10"},
 		{Code: "1700", Name: "Other Current Assets", Type: "asset", Group: "other_current_asset", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true, Parent: "10"},
@@ -58,10 +70,10 @@ func DefaultChartAccountSeeds() []defaultAccountSeed {
 		{Code: "1830", Name: "Machinery", Type: "asset", Group: "fixed_asset", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true, Parent: "18"},
 		{Code: "1840", Name: "Accumulated Depreciation", Type: "asset", Group: "accumulated_depreciation", NormalBalance: "credit", IsControlAccount: false, AllowManualPosting: true, Parent: "18"},
 		{Code: "1900", Name: "Other Non-Current Assets", Type: "asset", Group: "non_current_asset", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true, Parent: "18"},
-		{Code: "2000", Name: "Accounts Payable", Type: "liability", Group: "current_liability", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false, Parent: "20"},
-		{Code: "2050", Name: "Goods Received Not Invoiced / GRNI", Type: "liability", Group: "current_liability", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false, Parent: "20"},
-		{Code: "2100", Name: "VAT Payable", Type: "liability", Group: "current_liability", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false, Parent: "20"},
-		{Code: "2200", Name: "Customer Advance", Type: "liability", Group: "current_liability", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false, Parent: "20"},
+		{Code: "2000", Name: "Accounts Payable", Type: "liability", Group: "current_liability", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: true, Parent: "20"},
+		{Code: "2050", Name: "Goods Received Not Invoiced / GRNI", Type: "liability", Group: "current_liability", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: true, Parent: "20"},
+		{Code: "2100", Name: "VAT Payable", Type: "liability", Group: "current_liability", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: true, Parent: "20"},
+		{Code: "2200", Name: "Customer Advance", Type: "liability", Group: "current_liability", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: true, Parent: "20"},
 		{Code: "2300", Name: "Salary Payable", Type: "liability", Group: "current_liability", NormalBalance: "credit", IsControlAccount: false, AllowManualPosting: true, Parent: "20"},
 		{Code: "2400", Name: "Utility Payable", Type: "liability", Group: "current_liability", NormalBalance: "credit", IsControlAccount: false, AllowManualPosting: true, Parent: "20"},
 		{Code: "2500", Name: "Expense Payable", Type: "liability", Group: "current_liability", NormalBalance: "credit", IsControlAccount: false, AllowManualPosting: true, Parent: "20"},
@@ -70,21 +82,21 @@ func DefaultChartAccountSeeds() []defaultAccountSeed {
 		{Code: "2900", Name: "Other Liabilities", Type: "liability", Group: "other_liability", NormalBalance: "credit", IsControlAccount: false, AllowManualPosting: true, Parent: "28"},
 		{Code: "3000", Name: "Owner Capital", Type: "equity", Group: "equity", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: true, Parent: "30"},
 		{Code: "3010", Name: "Partner Capital", Type: "equity", Group: "partner_capital", NormalBalance: "credit", IsControlAccount: false, AllowManualPosting: true, Parent: "30"},
-		{Code: "3100", Name: "Retained Earnings", Type: "equity", Group: "equity", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false, Parent: "30"},
-		{Code: "3200", Name: "Current Year Profit / Loss", Type: "equity", Group: "equity", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false, Parent: "30"},
+		{Code: "3100", Name: "Retained Earnings", Type: "equity", Group: "equity", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: true, Parent: "30"},
+		{Code: "3200", Name: "Current Year Profit / Loss", Type: "equity", Group: "equity", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: true, Parent: "30"},
 		{Code: "3300", Name: "Drawings", Type: "equity", Group: "equity", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true, Parent: "30"},
-		{Code: "3400", Name: "Opening Balance Equity", Type: "equity", Group: "equity", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false, Parent: "30"},
-		{Code: "4000", Name: "Sales Income", Type: "income", Group: "sales_income", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false, Parent: "40"},
-		{Code: "4010", Name: "Bakery Order Income", Type: "income", Group: "sales_income", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false, Parent: "40"},
+		{Code: "3400", Name: "Opening Balance Equity", Type: "equity", Group: "equity", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: true, Parent: "30"},
+		{Code: "4000", Name: "Sales Income", Type: "income", Group: "sales_income", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: true, Parent: "40"},
+		{Code: "4010", Name: "Bakery Order Income", Type: "income", Group: "sales_income", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: true, Parent: "40"},
 		{Code: "4020", Name: "Service Income", Type: "income", Group: "service_income", NormalBalance: "credit", IsControlAccount: false, AllowManualPosting: true, Parent: "40"},
 		{Code: "4030", Name: "Discount Received", Type: "income", Group: "discount_income", NormalBalance: "credit", IsControlAccount: false, AllowManualPosting: true, Parent: "49"},
-		{Code: "4040", Name: "Sales Returns and Allowances", Type: "income", Group: "sales_income", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false, Parent: "40"},
-		{Code: "4050", Name: "Delivery Charge Income", Type: "income", Group: "sales_income", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false, Parent: "40"},
-		{Code: "4060", Name: "Service Charge Income", Type: "income", Group: "service_income", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false, Parent: "40"},
-		{Code: "4070", Name: "Packing Charge Income", Type: "income", Group: "sales_income", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false, Parent: "40"},
-		{Code: "4080", Name: "Delivery Charge Returns", Type: "income", Group: "sales_income", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false, Parent: "40"},
+		{Code: "4040", Name: "Sales Returns and Allowances", Type: "income", Group: "sales_income", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: true, Parent: "40"},
+		{Code: "4050", Name: "Delivery Charge Income", Type: "income", Group: "sales_income", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: true, Parent: "40"},
+		{Code: "4060", Name: "Service Charge Income", Type: "income", Group: "service_income", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: true, Parent: "40"},
+		{Code: "4070", Name: "Packing Charge Income", Type: "income", Group: "sales_income", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: true, Parent: "40"},
+		{Code: "4080", Name: "Delivery Charge Returns", Type: "income", Group: "sales_income", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: true, Parent: "40"},
 		{Code: "4090", Name: "Other Income", Type: "income", Group: "other_income", NormalBalance: "credit", IsControlAccount: false, AllowManualPosting: true, Parent: "49"},
-		{Code: "4100", Name: "Inventory Adjustment Gain", Type: "income", Group: "other_income", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false, Parent: "49"},
+		{Code: "4100", Name: "Inventory Adjustment Gain", Type: "income", Group: "other_income", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: true, Parent: "49"},
 		{Code: "5000", Name: "Opening Stock", Type: "cogs", Group: "direct_expense", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false, Parent: "50"},
 		{Code: "5010", Name: "Purchase", Type: "cogs", Group: "direct_expense", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false, Parent: "50"},
 		{Code: "5020", Name: "Purchase Return", Type: "cogs", Group: "direct_expense", NormalBalance: "credit", IsControlAccount: true, AllowManualPosting: false, Parent: "50"},
@@ -95,6 +107,9 @@ func DefaultChartAccountSeeds() []defaultAccountSeed {
 		{Code: "5070", Name: "Cost of Goods Sold", Type: "cogs", Group: "direct_expense", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false, Parent: "50"},
 		{Code: "5080", Name: "Wastage Expense", Type: "cogs", Group: "direct_expense", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false, Parent: "50"},
 		{Code: "5090", Name: "Inventory Adjustment Loss", Type: "cogs", Group: "direct_expense", NormalBalance: "debit", IsControlAccount: true, AllowManualPosting: false, Parent: "50"},
+		// Where people post hand corrections to cost of sales, so the automatic
+		// accounts above can stay locked. (Owner decision, 2026-09-16.)
+		{Code: "5095", Name: "Cost of Sales Adjustments (manual)", Type: "cogs", Group: "direct_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true, Parent: "50"},
 		{Code: "6000", Name: "Salary Expense", Type: "expense", Group: "operating_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true, Parent: "60"},
 		{Code: "6010", Name: "Rent Expense", Type: "expense", Group: "operating_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true, Parent: "60"},
 		{Code: "6020", Name: "Electricity Expense", Type: "expense", Group: "operating_expense", NormalBalance: "debit", IsControlAccount: false, AllowManualPosting: true, Parent: "60"},
@@ -150,7 +165,10 @@ func SeedDefaultChartOfAccounts(tx *gorm.DB, businessID string, requestedBranchI
 				AllowManualPosting: seed.AllowManualPosting,
 				Status:             "active",
 			}
-			if err := tx.Create(&account).Error; err != nil {
+			// Select("*"): without it GORM drops AllowManualPosting=false in
+			// favour of the column default TRUE, and no seeded account was ever
+			// actually locked. (ISSUE-039)
+			if err := tx.Select("*").Create(&account).Error; err != nil {
 				return err
 			}
 		}
