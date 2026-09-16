@@ -413,5 +413,5 @@ func handleError(c *gin.Context, err error) {
 		response.Error(c, appErr.StatusCode, appErr.Message, appErr.Details)
 		return
 	}
-	response.Error(c, http.StatusInternalServerError, "internal server error", err.Error())
+	response.InternalError(c, err)
 }
