@@ -1,5 +1,6 @@
 import { apiRequest } from "@/lib/api/client";
 import { pluckLookup } from "@/lib/api/lookups";
+import { SUPPLIER_PAYMENT_WITHOUT_BILL } from "@/lib/purchasing/supplier-payment-subject";
 import type { ItemStructure, ProductType } from "@/types/product";
 import { ITEM_STRUCTURES, PRODUCT_TYPES } from "@/types/product";
 import type {
@@ -785,7 +786,7 @@ function parseSupplierPayment(value: unknown): SupplierPayment {
   return {
     id: stringValue(value.payment_id, stringValue(value.id)),
     purchaseInvoiceId: optionalString(value.purchase_invoice_id),
-    invoiceNumber: stringValue(value.invoice_number, "Supplier payment"),
+    invoiceNumber: stringValue(value.invoice_number, SUPPLIER_PAYMENT_WITHOUT_BILL),
     supplierId: stringValue(value.supplier_id),
     supplierName: stringValue(value.supplier_name, "Supplier"),
     branchId: stringValue(value.branch_id),
