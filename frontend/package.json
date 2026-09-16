@@ -52,6 +52,7 @@
     "test:bill-action-gates": "node scripts/check-bill-action-gates.mjs",
     "test:draft-bill-delete": "node scripts/check-draft-bill-delete.mjs",
     "test:no-stub-placeholders": "node scripts/check-no-stub-placeholders.mjs",
+    "test:payment-allocation-prefill": "node scripts/check-payment-allocation-prefill.mjs",
     "test:payment-allocations-source": "node scripts/check-payment-allocations-source.mjs",
     "test:payment-method-note": "node scripts/check-payment-method-note.mjs",
     "test:payment-stage-label": "node scripts/check-payment-stage-label.mjs",
