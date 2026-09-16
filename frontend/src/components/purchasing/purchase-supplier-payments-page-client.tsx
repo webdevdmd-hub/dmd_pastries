@@ -37,6 +37,7 @@ import {
 } from "@/hooks/use-purchasing";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
 import { PURCHASE_PICKER_PAGE_SIZE } from "@/lib/api/purchasing";
+import { supplierPaymentSubject } from "@/lib/purchasing/supplier-payment-subject";
 import type {
   CreateSupplierPaymentPayload,
   PurchaseInvoice,
@@ -312,7 +313,7 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
     const confirmed = await confirm({
       cancelLabel: "Keep payment",
       confirmLabel: "Delete payment",
-      consequence: `This permanently deletes the ${formatAed(payment.amount)} payment to ${payment.supplierName} on invoice ${payment.invoiceNumber}. It cannot be undone.`,
+      consequence: `This permanently deletes the ${formatAed(payment.amount)} payment to ${payment.supplierName}, ${supplierPaymentSubject(payment)}. It cannot be undone.`,
       detail:
         "Reverses its effect on supplier outstanding, bill balances, supplier advance and the accounting records.",
       title: "Delete this payment?",
