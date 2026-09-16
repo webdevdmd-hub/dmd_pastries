@@ -888,6 +888,11 @@ export function RecipeFormPage({
                           setValueAs: numberFieldValue,
                         })}
                       />
+                      {fieldError("batchYieldQuantity") ? (
+                        <span className="text-sm text-danger-text">
+                          {fieldError("batchYieldQuantity")}
+                        </span>
+                      ) : null}
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="recipe-form-page-yield-unit">Yield unit</Label>
@@ -895,12 +900,25 @@ export function RecipeFormPage({
                         id="recipe-form-page-yield-unit"
                         disabled={!canEditRecipeForm}
                         emptyMessage="No matching units found."
-                        onValueChange={(value) => form.setValue("batchYieldUnitId", value)}
+                        onValueChange={(value) =>
+                          // Re-validate once the field has failed, so choosing a unit clears
+                          // its message instead of leaving it until the next save.
+                          form.setValue("batchYieldUnitId", value, {
+                            shouldValidate: Boolean(form.formState.errors.batchYieldUnitId),
+                          })
+                        }
                         options={unitOptions}
                         placeholder="Select unit"
                         searchPlaceholder="Search unit..."
                         value={batchYieldUnitId}
                       />
+                      {/* The save toast names Yield unit when it is missing, but the field
+                          itself showed nothing, so the operator had to find it. (ISSUE-041) */}
+                      {fieldError("batchYieldUnitId") ? (
+                        <span className="text-sm text-danger-text">
+                          {fieldError("batchYieldUnitId")}
+                        </span>
+                      ) : null}
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="prep-time">Preparation minutes</Label>
