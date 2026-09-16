@@ -136,6 +136,13 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
     editingPaymentId,
     canView && canManage && editingPaymentId !== null,
   );
+  // The list rows carry no allocations -- only GET /supplier-payments/:id
+  // does -- so the drawer fetches the payment itself. Rendering the row alone
+  // made the Bills settled tab announce every bill payment as an advance.
+  const detailsPaymentQuery = useSupplierPayment(
+    detailsPayment?.id ?? null,
+    canView && detailsOpen && detailsPayment !== null,
+  );
   const filterBranchId = branchScope.normalizeBranchId(filters.branchId);
   const branchOptions = useMemo(
     () =>
@@ -430,7 +437,7 @@ export function PurchaseSupplierPaymentsPageClient(): JSX.Element {
         onEdit={openEditPayment}
         onOpenChange={setDetailsOpen}
         open={detailsOpen}
-        payment={detailsPayment}
+        payment={detailsPaymentQuery.data ?? detailsPayment}
       />
 
       <PurchaseSupplierPaymentAllocationDialog

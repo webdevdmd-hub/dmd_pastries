@@ -19,6 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { paymentMethodTypeNote } from "@/lib/purchasing/payment-method-label";
 import type { SupplierPayment, SupplierPaymentStatus } from "@/types/purchasing";
 
 export type SupplierPaymentsListProps = {
@@ -163,9 +164,9 @@ export function PurchaseSupplierPaymentsTable({
             <TableCell>
               <span className="grid gap-0.5">
                 <span className="font-medium">{payment.paymentMethodName}</span>
-                {payment.paymentMethodType ? (
+                {paymentMethodTypeNote(payment.paymentMethodName, payment.paymentMethodType) ? (
                   <span className="text-meta text-foreground-muted">
-                    {payment.paymentMethodType.replace("_", " ")}
+                    {paymentMethodTypeNote(payment.paymentMethodName, payment.paymentMethodType)}
                   </span>
                 ) : null}
               </span>

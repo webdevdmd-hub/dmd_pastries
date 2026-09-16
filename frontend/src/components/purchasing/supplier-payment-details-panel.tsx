@@ -9,6 +9,7 @@ import {
   SupplierPaymentDetailViewTabs,
 } from "@/components/purchasing/supplier-payment-detail-view-tabs";
 import { ROUTES } from "@/constants/routes";
+import { paymentMethodTypeNote } from "@/lib/purchasing/payment-method-label";
 import type { SupplierPayment } from "@/types/purchasing";
 
 type SupplierPaymentDetailsPanelProps = {
@@ -77,7 +78,11 @@ export function SupplierPaymentDetailsPanel({
               />
               <DetailRow
                 label="Method"
-                value={`${payment.paymentMethodName}${payment.paymentMethodType ? ` · ${payment.paymentMethodType.replace("_", " ")}` : ""}`}
+                value={`${payment.paymentMethodName}${
+                  paymentMethodTypeNote(payment.paymentMethodName, payment.paymentMethodType)
+                    ? ` · ${paymentMethodTypeNote(payment.paymentMethodName, payment.paymentMethodType) ?? ""}`
+                    : ""
+                }`}
               />
               <DetailRow label="Paid through" value={payment.paidThroughAccountName ?? "—"} />
               <DetailRow label="Reference" value={payment.referenceNumber ?? "—"} />
@@ -90,8 +95,14 @@ export function SupplierPaymentDetailsPanel({
 
         {activeTab === "allocations" ? (
           payment.allocations.length === 0 ? (
+            // An empty list is not proof of an advance: the list endpoint sends
+            // no allocations at all, so a bill payment read as "held as supplier
+            // advance" while this same panel showed Used for bills 540.00. The
+            // amounts decide; the list only names the bills.
             <p className="rounded-lg border border-dashed border-border p-4 text-cell text-foreground-muted">
-              No bills were settled by this payment. The full amount is held as supplier advance.
+              {payment.allocatedAmount > 0
+                ? `This payment settled ${formatSupplierPaymentMoney(payment.allocatedAmount)} of bills. Loading which ones...`
+                : "No bills were settled by this payment. The full amount is held as supplier advance."}
             </p>
           ) : (
             <div className="grid gap-2">

@@ -35,9 +35,10 @@ type SupplierPaymentDetailsDrawerProps = {
 };
 
 /**
- * One payment made in a sheet over the ledger. The list rows already carry
- * the allocations, so the sheet needs no fetch of its own. The tab is plain
- * state here; the header offers the full page for anyone who wants a URL.
+ * One payment made in a sheet over the ledger. The host fetches the payment by
+ * id and passes it in: list rows carry no allocations, and this sheet shows
+ * which bills were settled. The tab is plain state here; the header offers the
+ * full page for anyone who wants a URL.
  */
 export function SupplierPaymentDetailsDrawer({
   canManage,
