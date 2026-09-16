@@ -157,6 +157,9 @@ export function stockMovementDescription(movement: StockMovementDisplaySource): 
       if (movement.referenceType === "production_batch") {
         return `Wastage from Production Batch ${reference}`;
       }
+      if (movement.referenceType === "production_wastage") {
+        return withReason(`Written off from Production Batch ${reference}`, movement.reason);
+      }
       return withReason(`Wastage recorded by ${actor}`, movement.reason);
     case "transfer":
     case "transfer_in":

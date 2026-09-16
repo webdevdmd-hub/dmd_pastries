@@ -26,7 +26,11 @@ import {
   useBatchPackaging,
   useBatchWastage,
 } from "@/hooks/use-manufacturing";
-import { canProduceBatch, isBatchPlannedStatus } from "@/lib/manufacturing/batch-status";
+import {
+  canProduceBatch,
+  canRecordBatchWastage,
+  isBatchPlannedStatus,
+} from "@/lib/manufacturing/batch-status";
 import type { ProductionBatch } from "@/types/manufacturing";
 
 type BatchDetailsDrawerProps = {
@@ -73,9 +77,7 @@ export function BatchDetailsDrawer({
 
   const isPlanned = batch ? isBatchPlannedStatus(batch.status) : false;
   const showProduce = batch ? canProduce && canProduceBatch(batch) : false;
-  const showWastage = batch
-    ? canRecordWastage && !isPlanned && batch.status !== "cancelled"
-    : false;
+  const showWastage = batch ? canRecordWastage && canRecordBatchWastage(batch) : false;
 
   return (
     <Sheet onOpenChange={onOpenChange} open={open}>

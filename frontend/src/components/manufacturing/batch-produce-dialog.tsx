@@ -66,7 +66,7 @@ export function BatchProduceDialog({
             value={quantityProduced}
           />
           <p className="text-sm text-foreground-muted">
-            Finished stock increases only when backend accepts this output record.
+            Finished stock increases once this output is saved.
           </p>
           {error ? <p className="text-sm font-semibold text-danger-text">{error}</p> : null}
         </div>

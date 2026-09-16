@@ -354,7 +354,7 @@ export function useProduceBatch() {
 export function useAddBatchWastage() {
   const queryClient = useQueryClient();
 
-  return useMutation<ProductionWastage, Error, { id: string; payload: WastagePayload }>({
+  return useMutation<ProductionBatch, Error, { id: string; payload: WastagePayload }>({
     mutationFn: async ({ id, payload }) => addBatchWastage(id, payload),
     onSuccess: async () => {
       await invalidateManufacturing(queryClient);

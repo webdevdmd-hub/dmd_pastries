@@ -3,6 +3,7 @@ package manufacturing
 import (
 	"errors"
 	"pastries-pos/internal/shared/money"
+	"strconv"
 	"strings"
 	"time"
 
@@ -455,10 +456,24 @@ func (s *Service) ProduceBatch(currentUser *utils.AuthContext, id string, req Pr
 	return s.GetBatch(currentUser, id)
 }
 
+// RecordWastage writes off finished goods from a produced batch: it takes the
+// quantity out of the product's stock as a wastage movement, which posts
+// Dr 5080 Wastage Expense / Cr 1200 Inventory, and adds it to the batch's
+// wastage total.
+//
+// Regression: ISSUE-043 — "Record wastage" could never succeed. The action was
+// offered only on completed batches, this refused everything but planned and
+// in-progress ones, and when it did accept a request it stored a bare number:
+// no stock left the shelf and nothing was expensed. Owner decision 2026-09-16:
+// batch wastage is real wastage.
 func (s *Service) RecordWastage(currentUser *utils.AuthContext, id string, req WastageBatchRequest, ipAddress, userAgent string) (*ProductionBatchResponse, error) {
-	wastageQuantity := req.QuantityValue()
-	if wastageQuantity < 0 {
-		return nil, apperrors.BadRequest("wastage_quantity must be non-negative", nil)
+	wastageQuantity := roundQuantity(req.QuantityValue())
+	if wastageQuantity <= 0 {
+		return nil, apperrors.BadRequest("Enter how many were wasted.", nil)
+	}
+	reason := strings.TrimSpace(req.ReasonValue())
+	if reason == "" {
+		return nil, apperrors.BadRequest("Enter a reason for the wastage.", nil)
 	}
 
 	err := s.db.Transaction(func(tx *gorm.DB) error {
@@ -469,13 +484,42 @@ func (s *Service) RecordWastage(currentUser *utils.AuthContext, id string, req W
 		if err := currentUser.EnsureRecordBranch(batch.BranchID); err != nil {
 			return err
 		}
-		if batch.Status != "planned" && batch.Status != "in_progress" {
-			return apperrors.BadRequest("only planned or in_progress batches can record wastage", nil)
+		if batch.Status != "completed" {
+			return apperrors.BadRequest("Wastage can be recorded once the batch has been produced.", productionBatchIssueDetails("invalid_batch_status", batch))
 		}
-
+		output, err := s.repo.Output(tx, id, currentUser.BusinessID)
+		if err != nil {
+			return err
+		}
+		if output == nil {
+			return apperrors.BadRequest("This batch has no finished stock to write off.", productionBatchIssueDetails("missing_output", batch))
+		}
+		remaining := batchWastageRemaining(batch.ProducedQuantity, batch.WastageQuantity)
+		if wastageQuantity > remaining {
+			return apperrors.BadRequest(batchWastageLimitMessage(remaining, s.repo.UnitSymbol(batch.YieldUnitID)), productionBatchIssueDetails("wastage_exceeds_output", batch))
+		}
+		movement, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{
+			BusinessID:      currentUser.BusinessID,
+			InventoryItemID: output.InventoryItemID,
+			MovementType:    "wastage",
+			Quantity:        money.FromFloat(wastageQuantity),
+			ReferenceType:   productionWastageReferenceType,
+			ReferenceID:     &batch.ID,
+			ReferenceNumber: batch.ProductionBatchNumber,
+			Reason:          reason,
+			CreatedByUserID: currentUser.UserID,
+		})
+		if err != nil {
+			return err
+		}
+		if s.accountingService != nil {
+			if _, err := s.accountingService.PostInventoryMovementJournal(tx, currentUser, movement.ID); err != nil {
+				return err
+			}
+		}
 		if err := s.repo.UpdateBatch(tx, id, currentUser.BusinessID, map[string]interface{}{
-			"wastage_quantity":   wastageQuantity,
-			"wastage_reason":     strings.TrimSpace(req.ReasonValue()),
+			"wastage_quantity":   roundQuantity(batch.WastageQuantity + wastageQuantity),
+			"wastage_reason":     reason,
 			"updated_by_user_id": currentUser.UserID,
 			"updated_at":         time.Now().UTC(),
 		}); err != nil {
@@ -487,6 +531,33 @@ func (s *Service) RecordWastage(currentUser *utils.AuthContext, id string, req W
 		return nil, err
 	}
 	return s.GetBatch(currentUser, id)
+}
+
+// productionWastageReferenceType marks finished goods written off from a
+// batch after production. It is deliberately not "production_batch": the batch
+// journal sums that reference's wastage when the batch completes, and a later
+// write-off posts its own journal.
+const productionWastageReferenceType = "production_wastage"
+
+// batchWastageRemaining is how much of a batch's output can still be written
+// off: what it produced less what has already been wasted.
+func batchWastageRemaining(producedQuantity, wastedQuantity float64) float64 {
+	remaining := roundQuantity(producedQuantity - wastedQuantity)
+	if remaining < 0 {
+		return 0
+	}
+	return remaining
+}
+
+func batchWastageLimitMessage(remaining float64, unitSymbol string) string {
+	quantity := strconv.FormatFloat(remaining, 'f', -1, 64)
+	if strings.TrimSpace(unitSymbol) != "" {
+		quantity += " " + strings.TrimSpace(unitSymbol)
+	}
+	if remaining <= 0 {
+		return "All of this batch has already been written off."
+	}
+	return "Only " + quantity + " of this batch can still be written off."
 }
 
 func (s *Service) GetOutputs(currentUser *utils.AuthContext, id string) (*ProductionOutputsResponse, error) {
@@ -546,6 +617,28 @@ func (s *Service) GetWastage(currentUser *utils.AuthContext, id string) (*Produc
 		details = append(details, s.ingredientResponses([]ProductionIngredientConsumption{ingredient})[0])
 	}
 
+	// The Wastage tab reads "wastage": one row per wastage movement, component
+	// loss at production and finished goods written off afterwards. It had
+	// nothing to read before -- the response carried no list, so the tab
+	// failed with "Backend list payload is invalid." (ISSUE-043)
+	movements, err := s.repo.BatchWastageMovements(s.db, currentUser.BusinessID, batch.ID)
+	if err != nil {
+		return nil, err
+	}
+	_, _, _, productName, productVariantName, _ := s.repo.NameLookups(currentUser.BusinessID, *batch)
+	outputName := productName
+	if strings.TrimSpace(productVariantName) != "" {
+		outputName = productName + " / " + productVariantName
+	}
+	componentNames := make(map[string]string, len(ingredients))
+	for _, ingredient := range ingredients {
+		componentNames[ingredient.InventoryItemID] = ingredient.ItemNameSnapshot
+	}
+	items := make([]ProductionWastageItemResponse, 0, len(movements))
+	for _, movement := range movements {
+		items = append(items, productionWastageItem(movement, outputName, componentNames))
+	}
+
 	return &ProductionWastageResponse{
 		BatchID:                  batch.ID,
 		Status:                   batch.Status,
@@ -553,6 +646,7 @@ func (s *Service) GetWastage(currentUser *utils.AuthContext, id string) (*Produc
 		WastageReason:            batch.WastageReason,
 		IngredientWastageTotal:   roundQuantity(total),
 		IngredientWastageDetails: details,
+		Items:                    items,
 	}, nil
 }
 
@@ -693,11 +787,8 @@ func (s *Service) completeBatchTx(tx *gorm.DB, currentUser *utils.AuthContext, i
 	if err != nil {
 		return err
 	}
-	outputUnitCost := 0.0
-	if producedQuantity > 0 {
-		outputUnitCost = roundMoney(consumedCost / producedQuantity)
-	}
-	movement, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{BusinessID: currentUser.BusinessID, InventoryItemID: outputItem.ID, MovementType: "production_in", Quantity: money.FromFloat(producedQuantity), UnitCost: money.FromFloat(outputUnitCost), ReferenceType: "production_batch", ReferenceID: &batch.ID, ReferenceNumber: batch.ProductionBatchNumber, Reason: "Production finished goods received", CreatedByUserID: currentUser.UserID})
+	outputUnitCost := productionOutputUnitCost(consumedCost, producedQuantity)
+	movement, err := s.inventoryService.ApplyMovement(tx, inventory.ApplyStockMovementInput{BusinessID: currentUser.BusinessID, InventoryItemID: outputItem.ID, MovementType: "production_in", Quantity: money.FromFloat(producedQuantity), UnitCost: outputUnitCost, ReferenceType: "production_batch", ReferenceID: &batch.ID, ReferenceNumber: batch.ProductionBatchNumber, Reason: "Production finished goods received", CreatedByUserID: currentUser.UserID})
 	if err != nil {
 		return err
 	}
@@ -712,7 +803,7 @@ func (s *Service) completeBatchTx(tx *gorm.DB, currentUser *utils.AuthContext, i
 			ProductID:        batch.ProductID,
 			ProductVariantID: batch.ProductVariantID,
 			InventoryItemID:  outputItem.ID,
-			Cost:             outputUnitCost,
+			Cost:             outputUnitCost.Round4().Float64(),
 			SourceType:       "production_batch",
 			SourceID:         &batch.ID,
 			SourceNumber:     batch.ProductionBatchNumber,
@@ -736,7 +827,13 @@ func (s *Service) completeBatchTx(tx *gorm.DB, currentUser *utils.AuthContext, i
 	}
 	now := time.Now().UTC()
 	total := roundMoney(ingredientCost + packagingCost)
-	if err := s.repo.UpdateBatch(tx, id, currentUser.BusinessID, map[string]interface{}{"status": "completed", "production_date": productionDate, "produced_quantity": producedQuantity, "completed_at": now, "completed_by_user_id": currentUser.UserID, "ingredient_cost": ingredientCost, "packaging_cost": packagingCost, "total_production_cost": total, "cost_per_unit": roundQuantity(total / producedQuantity), "wastage_quantity": wastageQuantity, "wastage_reason": wastageReason, "notes": notes, "updated_by_user_id": currentUser.UserID, "updated_at": now}); err != nil {
+	completion := map[string]interface{}{"status": "completed", "production_date": productionDate, "produced_quantity": producedQuantity, "completed_at": now, "completed_by_user_id": currentUser.UserID, "ingredient_cost": ingredientCost, "packaging_cost": packagingCost, "total_production_cost": total, "cost_per_unit": roundQuantity(total / producedQuantity), "wastage_quantity": wastageQuantity, "wastage_reason": wastageReason, "notes": notes, "updated_by_user_id": currentUser.UserID, "updated_at": now}
+	// "Produce now" and "Produce planned" never pass through Start, so the batch
+	// showed "Start time: Not set" once it was finished. (ISSUE-042)
+	if batch.StartedAt == nil {
+		completion["started_at"] = now
+	}
+	if err := s.repo.UpdateBatch(tx, id, currentUser.BusinessID, completion); err != nil {
 		return err
 	}
 	if s.accountingService != nil {
@@ -1526,6 +1623,49 @@ func validateListQuery(query BatchListQuery) error {
 		return apperrors.BadRequest("invalid status", nil)
 	}
 	return nil
+}
+
+// productionOutputUnitCost is the unit cost finished goods enter stock at. It
+// is left unrounded so the stock-in total -- unit cost times quantity, rounded
+// to cents -- equals what production consumed.
+//
+// Regression: ISSUE-041 — it was rounded to cents first. 100.00 of components
+// making 3 cakes entered stock at 33.33 each, 99.99 in total; the batch journal
+// moved 100.00 into Work in Process and 99.99 out, and the cent stayed in 1210
+// for good. A small unit cost lost everything: 1.00 across 1,000 biscuits
+// rounds to 0.00, so they entered stock at no value at all.
+func productionOutputUnitCost(consumedCost, producedQuantity float64) money.Amount {
+	if producedQuantity <= 0 {
+		return money.Zero
+	}
+	return money.FromFloat(consumedCost).Div(money.FromFloat(producedQuantity))
+}
+
+func productionWastageItem(movement batchWastageMovement, outputName string, componentNames map[string]string) ProductionWastageItemResponse {
+	item := ProductionWastageItemResponse{
+		ID:                       movement.ID,
+		InventoryItemID:          movement.InventoryItemID,
+		Quantity:                 roundQuantity(movement.Quantity),
+		UnitName:                 movement.UnitSymbol,
+		Reason:                   movement.Reason,
+		UnitCostSnapshot:         roundQuantity(movement.UnitCostSnapshot),
+		TotalCost:                roundMoney(movement.TotalCost),
+		StockMovementID:          movement.ID,
+		AccountingJournalEntryID: movement.AccountingJournalEntryID,
+		IsReversed:               movement.IsReversed,
+		CreatedAt:                movement.CreatedAt,
+	}
+	if movement.ReferenceType == productionWastageReferenceType {
+		item.WastageType = "finished_goods"
+		item.ItemName = outputName
+	} else {
+		item.WastageType = "component"
+		item.ItemName = componentNames[movement.InventoryItemID]
+	}
+	if strings.TrimSpace(item.ItemName) == "" {
+		item.ItemName = "Item"
+	}
+	return item
 }
 
 func batchCanEditConsumption(status string) bool {

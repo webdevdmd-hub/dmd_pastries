@@ -5,6 +5,7 @@ import (
 	"math"
 	"pastries-pos/internal/shared/money"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -122,6 +123,34 @@ func (r *Repository) Output(tx *gorm.DB, batchID, businessID string) (*Productio
 		return nil, nil
 	}
 	return &output, nil
+}
+
+type batchWastageMovement struct {
+	ID                       string
+	InventoryItemID          string
+	ReferenceType            string
+	Quantity                 float64
+	UnitCostSnapshot         float64
+	TotalCost                float64
+	Reason                   string
+	AccountingJournalEntryID *string
+	IsReversed               bool
+	UnitSymbol               string
+	CreatedAt                time.Time
+}
+
+// BatchWastageMovements lists a batch's wastage stock movements, oldest first:
+// component loss consumed at production and finished goods written off later.
+func (r *Repository) BatchWastageMovements(tx *gorm.DB, businessID, batchID string) ([]batchWastageMovement, error) {
+	var rows []batchWastageMovement
+	err := tx.Table("stock_movements sm").
+		Select("sm.id, sm.inventory_item_id, sm.reference_type, sm.quantity, sm.unit_cost_snapshot, sm.total_cost, sm.reason, sm.accounting_journal_entry_id, sm.is_reversed, COALESCE(u.symbol, '') AS unit_symbol, sm.created_at").
+		Joins("LEFT JOIN units u ON u.id = sm.unit_id").
+		Where("sm.business_id = ? AND sm.reference_id = ? AND sm.movement_type = ? AND sm.is_reversal = FALSE", businessID, batchID, "wastage").
+		Where("sm.reference_type IN ?", []string{"production_batch", "production_wastage"}).
+		Order("sm.created_at ASC").
+		Scan(&rows).Error
+	return rows, err
 }
 
 func (r *Repository) UpdateIngredient(tx *gorm.DB, id, batchID, businessID string, updates map[string]interface{}) error {
