@@ -361,12 +361,36 @@ func (r *Repository) ValidateCustomer(tx *gorm.DB, businessID, branchID, custome
 // be booked against an account belonging to its own branch.
 // FindPostedJournalBySource makes expense posting idempotent: a retry returns
 // the entry already posted for that expense instead of creating a second one.
+// FindPostedJournalBySource finds the journal currently carrying an expense.
+//
+// It used to accept status "reversed" too. Editing a posted expense reverses
+// its journal and then posts a replacement with the same source -- and the
+// replacement's idempotency check found the journal it had just reversed and
+// returned THAT as the new entry. Nothing was posted: the expense read "Posted,
+// AED 30.00" while the ledger carried nothing for it at all. A reversed journal
+// no longer carries the expense, so it is not an existing posting.
+//
+// Regression: ISSUE-035 — editing a posted expense removed it from the ledger
+// Found by /qa on 2026-09-16
 func (r *Repository) FindPostedJournalBySource(tx *gorm.DB, businessID, sourceType, sourceID string) (*accounting.JournalEntry, error) {
 	var entry accounting.JournalEntry
-	err := tx.Where("business_id = ? AND source_type = ? AND source_id = ? AND status IN ? AND deleted_at IS NULL",
-		businessID, sourceType, sourceID, []string{"posted", "reversed"}).
+	err := tx.Where("business_id = ? AND source_type = ? AND source_id = ? AND status = ? AND deleted_at IS NULL",
+		businessID, sourceType, sourceID, "posted").
 		First(&entry).Error
 	return &entry, err
+}
+
+// JournalIsLive reports whether a journal still carries its amounts: posted and
+// not reversed or deleted.
+func (r *Repository) JournalIsLive(tx *gorm.DB, businessID string, entryID *string) (bool, error) {
+	if entryID == nil || *entryID == "" {
+		return false, nil
+	}
+	var count int64
+	err := tx.Model(&accounting.JournalEntry{}).
+		Where("business_id = ? AND id = ? AND status = ? AND deleted_at IS NULL", businessID, *entryID, "posted").
+		Count(&count).Error
+	return count > 0, err
 }
 
 func (r *Repository) ValidateAccount(tx *gorm.DB, businessID, branchID, accountID string) (*accounting.ChartAccount, error) {
