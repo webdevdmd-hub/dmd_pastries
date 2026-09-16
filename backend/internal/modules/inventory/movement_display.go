@@ -68,6 +68,9 @@ func movementDescription(movement StockMovement, movementLabel, referenceLabel, 
 		if movement.ReferenceType == "production_batch" {
 			return "Wastage from Production Batch " + referenceLabel
 		}
+		if movement.ReferenceType == "production_wastage" {
+			return withReason("Written off from Production Batch "+referenceLabel, reason)
+		}
 		return withReason("Wastage recorded by "+actor, reason)
 	case "transfer", "transfer_in", "transfer_out":
 		return "Transferred from " + friendlyValue(fromLocationName, "Unknown location") + " to " + friendlyValue(toLocationName, "Unknown location")
@@ -154,7 +157,7 @@ func sourceModuleLabel(referenceType, movementType string) string {
 	case "bakery_order", "bakery_order_cancelled":
 		// Fell through to "Inventory", which named no source at all.
 		return "Bakery Orders"
-	case "production_batch":
+	case "production_batch", "production_wastage":
 		return "Manufacturing"
 	case "stock_transfer":
 		return "Stock Transfer"

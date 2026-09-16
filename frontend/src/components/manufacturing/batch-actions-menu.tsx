@@ -10,7 +10,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { canProduceBatch, isBatchPlannedStatus } from "@/lib/manufacturing/batch-status";
+import {
+  canProduceBatch,
+  canRecordBatchWastage,
+  isBatchPlannedStatus,
+} from "@/lib/manufacturing/batch-status";
 import type { ProductionBatch } from "@/types/manufacturing";
 
 export type BatchActionHandlers = {
@@ -47,7 +51,7 @@ export function BatchActionsMenu({
   const showEdit = canEdit && isPlanned;
   const showProduce = canProduce && canProduceBatch(batch);
   const showDelete = canDelete && isPlanned;
-  const showWastage = canRecordWastage && !isPlanned && batch.status !== "cancelled";
+  const showWastage = canRecordWastage && canRecordBatchWastage(batch);
 
   // A completed batch that the viewer cannot waste against has nothing here,
   // and an empty dropdown is worse than no dropdown.

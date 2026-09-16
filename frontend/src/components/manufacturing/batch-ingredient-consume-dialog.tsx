@@ -93,7 +93,7 @@ export function BatchIngredientConsumeDialog({
         <DialogHeader className="border-b border-border px-7 py-6">
           <DialogTitle>Consume ingredients</DialogTitle>
           <DialogDescription>
-            Record ingredient stock-out for this batch. Backend inventory validation is final.
+            Record ingredient stock-out for this batch. Stock is checked when you save.
           </DialogDescription>
         </DialogHeader>
         <div className="max-h-[calc(90vh-12rem)] space-y-3 overflow-y-auto px-7 py-6">

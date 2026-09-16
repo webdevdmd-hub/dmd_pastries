@@ -6,7 +6,7 @@ import type { JSX } from "react";
 import { BatchStatusBadge } from "@/components/manufacturing/batch-status-badge";
 import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/constants/routes";
-import { canProduceBatch, isBatchPlannedStatus } from "@/lib/manufacturing/batch-status";
+import { canProduceBatch, canRecordBatchWastage } from "@/lib/manufacturing/batch-status";
 import { formatRecipeVersionLabel } from "@/lib/manufacturing/recipe-version-display";
 import type { ProductionBatch } from "@/types/manufacturing";
 
@@ -31,8 +31,7 @@ export function BatchHeader({
   onProduce?: () => void;
   onRecordWastage?: () => void;
 }): JSX.Element {
-  const canShowWastageAction =
-    canRecordWastage && !isBatchPlannedStatus(batch.status) && batch.status !== "cancelled";
+  const canShowWastageAction = canRecordWastage && canRecordBatchWastage(batch);
   const canShowProduceAction = canProduce && canProduceBatch(batch);
 
   return (

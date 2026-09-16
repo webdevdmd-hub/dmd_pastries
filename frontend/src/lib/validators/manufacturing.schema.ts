@@ -43,12 +43,21 @@ export const produceSchema = z.object({
   quantityProduced: z.coerce.number().positive("Produced quantity must be greater than 0."),
 });
 
-export const wastageSchema = z.object({
-  inventoryItemId: z.string().min(1, "Inventory item is required."),
-  wastageType: z.string().min(1, "Wastage type is required."),
-  quantity: z.coerce.number().positive("Wastage quantity must be greater than 0."),
-  reason: z.string().min(1, "Reason is required."),
-});
+export function batchWastageSchema(remaining: number, unit: string) {
+  return z.object({
+    quantity: z.coerce
+      .number()
+      .positive("Enter how many were wasted.")
+      .max(
+        remaining,
+        `Only ${String(remaining)} ${unit} of this batch can still be written off.`.replace(
+          "  ",
+          " ",
+        ),
+      ),
+    reason: z.string().trim().min(1, "Enter a reason for the wastage."),
+  });
+}
 
 export const batchFiltersSchema = z.object({
   branchId: z.string(),
@@ -71,4 +80,4 @@ export type CreateBatchFormValues = z.infer<typeof createBatchSchema>;
 export type CreateProductionFormValues = z.infer<typeof createProductionSchema>;
 export type ConsumeFormValues = z.infer<typeof consumeSchema>;
 export type ProduceFormValues = z.infer<typeof produceSchema>;
-export type WastageFormValues = z.infer<typeof wastageSchema>;
+export type WastageFormValues = z.infer<ReturnType<typeof batchWastageSchema>>;

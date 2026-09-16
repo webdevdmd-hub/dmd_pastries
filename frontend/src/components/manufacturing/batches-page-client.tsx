@@ -38,7 +38,6 @@ import {
   useCreateProduction,
   useDeleteBatch,
   useManufacturingBranches,
-  useManufacturingInventory,
   useManufacturingProducts,
   useProduceBatch,
   useUpdateBatch,
@@ -95,7 +94,6 @@ export function BatchesPageClient(): JSX.Element {
   const batchesQuery = useBatches(filters, canView && branchScope.hasBranchScope);
   const productsQuery = useManufacturingProducts(canView);
   const branchesQuery = useManufacturingBranches(canView);
-  const inventoryQuery = useManufacturingInventory(canView && canRecordWastage);
   const createPlannedMutation = useCreateBatch();
   const createProductionMutation = useCreateProduction();
   const updateBatchMutation = useUpdateBatch();
@@ -315,7 +313,7 @@ export function BatchesPageClient(): JSX.Element {
           <h1 className="mt-2 text-4xl font-semibold tracking-tight text-foreground">Production</h1>
           <p className="mt-2 max-w-2xl text-base text-foreground-muted">
             Choose a recipe and output quantity. Component consumption, packaging consumption,
-            output stock, costing, and accounting are handled automatically by the backend.
+            output stock, costing, and accounting are handled automatically.
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -382,7 +380,7 @@ export function BatchesPageClient(): JSX.Element {
 
       {!batchesQuery.isLoading && batchesQuery.error ? (
         isPermissionDenied ? (
-          <AccessDeniedCard message="The backend denied access to manufacturing batches." />
+          <AccessDeniedCard message="You do not have access to manufacturing batches." />
         ) : (
           <ManufacturingErrorState
             description={getErrorMessage(batchesQuery.error)}
@@ -473,11 +471,10 @@ export function BatchesPageClient(): JSX.Element {
       />
 
       <BatchWastageDialog
-        inventory={inventoryQuery.data ?? []}
+        batch={wastageBatch}
         isSubmitting={addWastageMutation.isPending}
         onClose={() => setWastageBatch(null)}
         onWastage={handleWastage}
-        open={wastageBatch !== null}
       />
 
       <Dialog

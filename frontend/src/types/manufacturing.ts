@@ -110,6 +110,8 @@ export type ProductionWastage = {
   totalCost: number;
   stockMovementId: string | null;
   accountingJournalEntryId: string | null;
+  /** Reversed from the stock movement page; the loss no longer stands. */
+  isReversed: boolean;
   createdAt: string;
 };
 
@@ -264,8 +266,6 @@ export type ProducePayload = {
 };
 
 export type WastagePayload = {
-  inventoryItemId: string;
-  wastageType: string;
   quantity: number;
   reason: string;
 };

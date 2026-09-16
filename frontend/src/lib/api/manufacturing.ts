@@ -62,8 +62,6 @@ type BackendProducePayload = {
 };
 
 type BackendWastagePayload = {
-  inventory_item_id: string;
-  wastage_type: string;
   quantity: number;
   reason: string;
 };
@@ -310,7 +308,7 @@ function parseWastage(value: unknown): ProductionWastage {
     componentVariantName: nullableString(value.component_variant_name),
     componentProductType: optionalProductType(value.component_product_type),
     inventoryItemId: stringValue(value.inventory_item_id),
-    itemName: stringValue(value.component_product_name, stringValue(value.item_name, "Item")),
+    itemName: stringValue(value.item_name, stringValue(value.component_product_name, "Item")),
     wastageType: stringValue(value.wastage_type, "wastage"),
     quantity: numberValue(value.quantity),
     unitName: stringValue(value.unit_name, "Unit"),
@@ -319,6 +317,7 @@ function parseWastage(value: unknown): ProductionWastage {
     totalCost: numberValue(value.total_cost),
     stockMovementId: nullableString(value.stock_movement_id),
     accountingJournalEntryId: nullableString(value.accounting_journal_entry_id),
+    isReversed: value.is_reversed === true,
     createdAt: stringValue(value.created_at),
   };
 }
@@ -557,8 +556,6 @@ function producePayload(payload: ProducePayload): BackendProducePayload {
 
 function wastagePayload(payload: WastagePayload): BackendWastagePayload {
   return {
-    inventory_item_id: payload.inventoryItemId,
-    wastage_type: payload.wastageType,
     quantity: payload.quantity,
     reason: payload.reason,
   };
@@ -715,17 +712,18 @@ export async function produceBatch(id: string, payload: ProducePayload): Promise
   return response.data;
 }
 
+// The server answers with the updated batch, not a wastage row.
 export async function addBatchWastage(
   id: string,
   payload: WastagePayload,
-): Promise<ProductionWastage> {
-  const response = await apiRequest<ProductionWastage, BackendWastagePayload>(
+): Promise<ProductionBatch> {
+  const response = await apiRequest<ProductionBatch, BackendWastagePayload>(
     `/api/v1/manufacturing/batches/${id}/wastage`,
     {
       method: "POST",
       authMode: "appwrite",
       body: wastagePayload(payload),
-      parse: parseWastage,
+      parse: parseBatch,
     },
   );
 

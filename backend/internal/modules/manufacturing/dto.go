@@ -63,6 +63,7 @@ type WastageBatchRequest struct {
 	Quantity             float64 `json:"quantity"`
 	WastageReason        string  `json:"wastage_reason"`
 	WastageReasonCamel   string  `json:"wastageReason"`
+	Reason               string  `json:"reason"`
 }
 
 type CompleteBatchRequest struct {
@@ -211,12 +212,32 @@ type ProductionOutputsResponse struct {
 }
 
 type ProductionWastageResponse struct {
-	BatchID                  string                         `json:"batch_id"`
-	Status                   string                         `json:"status"`
-	WastageQuantity          float64                        `json:"wastage_quantity"`
-	WastageReason            string                         `json:"wastage_reason"`
-	IngredientWastageTotal   float64                        `json:"ingredient_wastage_total"`
-	IngredientWastageDetails []ProductionIngredientResponse `json:"ingredient_wastage_details"`
+	BatchID                  string                          `json:"batch_id"`
+	Status                   string                          `json:"status"`
+	WastageQuantity          float64                         `json:"wastage_quantity"`
+	WastageReason            string                          `json:"wastage_reason"`
+	IngredientWastageTotal   float64                         `json:"ingredient_wastage_total"`
+	IngredientWastageDetails []ProductionIngredientResponse  `json:"ingredient_wastage_details"`
+	Items                    []ProductionWastageItemResponse `json:"wastage"`
+}
+
+// ProductionWastageItemResponse is one wastage movement against a batch.
+// WastageType is "component" for loss declared on a recipe line and consumed
+// at production, "finished_goods" for output written off afterwards.
+type ProductionWastageItemResponse struct {
+	ID                       string    `json:"id"`
+	InventoryItemID          string    `json:"inventory_item_id"`
+	ItemName                 string    `json:"item_name"`
+	WastageType              string    `json:"wastage_type"`
+	Quantity                 float64   `json:"quantity"`
+	UnitName                 string    `json:"unit_name"`
+	Reason                   string    `json:"reason"`
+	UnitCostSnapshot         float64   `json:"unit_cost_snapshot"`
+	TotalCost                float64   `json:"total_cost"`
+	StockMovementID          string    `json:"stock_movement_id"`
+	AccountingJournalEntryID *string   `json:"accounting_journal_entry_id"`
+	IsReversed               bool      `json:"is_reversed"`
+	CreatedAt                time.Time `json:"created_at"`
 }
 
 type ManufacturingSummaryResponse struct {
@@ -335,5 +356,8 @@ func (r WastageBatchRequest) ReasonValue() string {
 	if r.WastageReason != "" {
 		return r.WastageReason
 	}
-	return r.WastageReasonCamel
+	if r.WastageReasonCamel != "" {
+		return r.WastageReasonCamel
+	}
+	return r.Reason
 }

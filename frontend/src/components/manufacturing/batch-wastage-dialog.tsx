@@ -13,74 +13,58 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { wastageSchema } from "@/lib/validators/manufacturing.schema";
-import type { ManufacturingInventoryOption, WastagePayload } from "@/types/manufacturing";
-import { PRODUCT_TYPE_LABELS } from "@/types/product";
+import { Label } from "@/components/ui/label";
+import { batchWastageRemaining } from "@/lib/manufacturing/batch-status";
+import { batchWastageSchema } from "@/lib/validators/manufacturing.schema";
+import type { ProductionBatch, WastagePayload } from "@/types/manufacturing";
 
-function inventoryLabel(item: ManufacturingInventoryOption): string {
-  return item.productVariantName ?? item.productName ?? item.itemName;
-}
-
-function inventoryMeta(item: ManufacturingInventoryOption): string {
-  const parts = [
-    item.productType ? PRODUCT_TYPE_LABELS[item.productType] : null,
-    item.unitSymbol || item.unitName,
-  ].filter((part): part is string => Boolean(part));
-
-  return parts.join(" / ");
-}
-
+/**
+ * Writes off finished goods from a produced batch. The server takes them out
+ * of stock and posts the cost to Wastage Expense, so the dialog names what is
+ * being written off and how much is left, instead of the old free item picker
+ * and "wastage type" text box, which the server ignored. (ISSUE-044)
+ */
 export function BatchWastageDialog({
-  inventory,
+  batch,
   isSubmitting,
   onClose,
   onWastage,
-  open,
 }: {
-  inventory: ManufacturingInventoryOption[];
+  batch: ProductionBatch | null;
   isSubmitting: boolean;
   onClose: () => void;
   onWastage: (payload: WastagePayload) => Promise<void>;
-  open: boolean;
 }): JSX.Element {
-  const [inventoryItemId, setInventoryItemId] = useState("");
-  const [wastageType, setWastageType] = useState("ingredient");
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState("1");
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const open = batch !== null;
 
   useEffect(() => {
     if (!open) {
       return;
     }
 
-    setInventoryItemId("");
-    setWastageType("ingredient");
-    setQuantity(1);
+    setQuantity("1");
     setReason("");
     setError(null);
   }, [open]);
 
+  const remaining = batch ? batchWastageRemaining(batch) : 0;
+  const unit = batch?.batchUnitName ?? "";
+  const productName = batch
+    ? `${batch.productName}${batch.productVariantName ? ` - ${batch.productVariantName}` : ""}`
+    : "";
+
   const submit = async (): Promise<void> => {
-    const result = wastageSchema.safeParse({
-      inventoryItemId,
-      quantity,
-      reason,
-      wastageType,
-    });
+    const result = batchWastageSchema(remaining, unit).safeParse({ quantity, reason });
 
     if (!result.success) {
-      setError(result.error.issues[0]?.message ?? "Please check wastage form.");
+      setError(result.error.issues[0]?.message ?? "Please check the wastage details.");
       return;
     }
 
+    setError(null);
     await onWastage(result.data);
   };
 
@@ -88,49 +72,43 @@ export function BatchWastageDialog({
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)}>
       <DialogContent className="max-w-xl p-0">
         <DialogHeader className="border-b border-border px-7 py-6">
-          <DialogTitle>Add wastage</DialogTitle>
+          <DialogTitle>Record wastage</DialogTitle>
           <DialogDescription>
-            Record unusable stock or production waste for audit visibility.
+            Write off {productName} from {batch?.batchNumber}. Stock goes down and the cost is
+            posted to Wastage Expense.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 px-7 py-6">
-          <Select
-            value={inventoryItemId || "none"}
-            onValueChange={(value) => setInventoryItemId(value === "none" ? "" : value)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Inventory item" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">Select item</SelectItem>
-              {inventory.map((item) => (
-                <SelectItem key={item.id} value={item.id}>
-                  {inventoryLabel(item)}
-                  {inventoryMeta(item) ? ` (${inventoryMeta(item)})` : ""}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Input
-            aria-label="Wastage type"
-            onChange={(event) => setWastageType(event.target.value)}
-            placeholder="Wastage type"
-            value={wastageType}
-          />
-          <Input
-            aria-label="Quantity"
-            min="0"
-            onChange={(event) => setQuantity(Number(event.target.value))}
-            type="number"
-            value={quantity}
-          />
-          <Input
-            aria-label="Reason"
-            onChange={(event) => setReason(event.target.value)}
-            placeholder="Reason"
-            value={reason}
-          />
-          {error ? <p className="text-sm font-semibold text-danger-text">{error}</p> : null}
+          <div className="grid gap-2">
+            <Label htmlFor="batch-wastage-quantity">Quantity wasted</Label>
+            <Input
+              id="batch-wastage-quantity"
+              inputMode="decimal"
+              max={remaining}
+              min="0"
+              onChange={(event) => setQuantity(event.target.value)}
+              step="any"
+              type="number"
+              value={quantity}
+            />
+            <p className="text-meta text-foreground-muted tabular-nums">
+              Up to {remaining} {unit} can be written off.
+            </p>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="batch-wastage-reason">Reason</Label>
+            <Input
+              id="batch-wastage-reason"
+              onChange={(event) => setReason(event.target.value)}
+              placeholder="For example: dropped, burnt, expired"
+              value={reason}
+            />
+          </div>
+          {error ? (
+            <p className="text-sm font-semibold text-danger-text" role="alert">
+              {error}
+            </p>
+          ) : null}
         </div>
         <DialogFooter className="border-t border-border bg-muted px-7 py-5">
           <Button onClick={onClose} type="button" variant="outline">
@@ -142,7 +120,7 @@ export function BatchWastageDialog({
             onClick={() => void submit()}
             type="button"
           >
-            Add wastage
+            {isSubmitting ? "Recording..." : "Record wastage"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -5,7 +5,6 @@ import {
   StockMovementLink,
 } from "@/components/shared/accounting-reference-links";
 import type { ProductionWastage } from "@/types/manufacturing";
-import { PRODUCT_TYPE_LABELS } from "@/types/product";
 
 function formatDate(value: string): string {
   return value
@@ -27,16 +26,19 @@ function wastageName(item: ProductionWastage): string {
 }
 
 function wastageMeta(item: ProductionWastage): string {
-  const parts = [
-    item.componentProductType ? PRODUCT_TYPE_LABELS[item.componentProductType] : "Legacy item",
-    item.componentVariantName,
-  ].filter((part): part is string => Boolean(part));
+  const kind =
+    item.wastageType === "finished_goods"
+      ? "Finished goods written off"
+      : "Component loss at production";
 
-  return parts.join(" / ");
+  return item.isReversed ? `${kind} · Reversed` : kind;
 }
 
 export function BatchWastageSection({ wastage }: { wastage: ProductionWastage[] }): JSX.Element {
-  const totalCost = wastage.reduce((total, item) => total + item.totalCost, 0);
+  const totalCost = wastage.reduce(
+    (total, item) => (item.isReversed ? total : total + item.totalCost),
+    0,
+  );
 
   return (
     <section className="rounded-2xl border border-danger/30 bg-card p-5">
@@ -44,7 +46,7 @@ export function BatchWastageSection({ wastage }: { wastage: ProductionWastage[] 
         <div>
           <h2 className="text-sm font-semibold text-danger-text">Production Wastage</h2>
           <p className="mt-1 text-sm text-foreground-muted">
-            Backend-recorded losses and stock movements for this production.
+            Component loss at production and finished goods written off afterwards.
           </p>
         </div>
       </div>
@@ -65,7 +67,7 @@ export function BatchWastageSection({ wastage }: { wastage: ProductionWastage[] 
                   <p className="font-semibold text-foreground">{wastageName(item)}</p>
                   <p className="text-xs text-foreground-muted">{wastageMeta(item)}</p>
                   <p className="mt-1 text-sm text-foreground-muted">
-                    {item.quantity} {item.unitName} / {item.wastageType}
+                    {item.quantity} {item.unitName}
                   </p>
                   {item.reason ? (
                     <p className="mt-2 rounded-lg border border-danger/30 bg-danger-tint px-3 py-2 text-sm text-danger-text">

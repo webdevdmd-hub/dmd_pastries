@@ -516,8 +516,8 @@ export function BatchFormDialog({
         <DialogHeader className="shrink-0 border-b border-border px-8 py-6">
           <DialogTitle>{batch ? "Edit planned production" : "Create production"}</DialogTitle>
           <DialogDescription>
-            Save a planned production without stock impact, or produce now to let the backend
-            consume components, create stock, and post accounting in one transaction.
+            Save a planned production without stock impact, or produce now to consume components,
+            create stock, and post accounting in one transaction.
           </DialogDescription>
         </DialogHeader>
 

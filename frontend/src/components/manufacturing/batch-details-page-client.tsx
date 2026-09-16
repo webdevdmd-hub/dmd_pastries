@@ -25,7 +25,6 @@ import {
   useBatchOutputs,
   useBatchPackaging,
   useBatchWastage,
-  useManufacturingInventory,
   useProduceBatch,
 } from "@/hooks/use-manufacturing";
 import { usePermission } from "@/hooks/use-permission";
@@ -48,7 +47,6 @@ export function BatchDetailsPageClient({ batchId }: { batchId: string }): JSX.El
   const packagingQuery = useBatchPackaging(batchId, canView);
   const outputsQuery = useBatchOutputs(batchId, canView);
   const wastageQuery = useBatchWastage(batchId, canView);
-  const inventoryQuery = useManufacturingInventory(canView && canRecordWastage);
   const addWastageMutation = useAddBatchWastage();
   const produceBatchMutation = useProduceBatch();
 
@@ -148,11 +146,10 @@ export function BatchDetailsPageClient({ batchId }: { batchId: string }): JSX.El
       />
 
       <BatchWastageDialog
-        inventory={inventoryQuery.data ?? []}
+        batch={wastageOpen ? batch : null}
         isSubmitting={addWastageMutation.isPending}
         onClose={() => setWastageOpen(false)}
         onWastage={handleWastage}
-        open={wastageOpen}
       />
     </div>
   );

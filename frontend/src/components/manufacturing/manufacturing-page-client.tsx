@@ -18,15 +18,14 @@ const actions = [
   {
     cta: "Create production",
     description:
-      "Choose an active recipe and quantity. Backend handles consumption, output, costing, and accounting.",
+      "Choose an active recipe and quantity. Consumption, output, costing, and accounting are handled for you.",
     href: ROUTES.manufacturingBatches,
     icon: Factory,
     label: "Create Production",
   },
   {
     cta: "Review history",
-    description:
-      "Review backend-generated component usage, output stock, wastage, and journal links.",
+    description: "Review component usage, output stock, wastage, and journal links.",
     href: ROUTES.manufacturingBatches,
     icon: Trash2,
     label: "Production History",
@@ -123,8 +122,8 @@ export function ManufacturingPageClient(): JSX.Element {
           <div>
             <p className="text-xl font-semibold text-foreground">Global Efficiency</p>
             <p className="mt-2 max-w-2xl text-foreground-muted">
-              Production variance and cost snapshots are captured on each backend production record.
-              Use production details for component stock movement and journal links.
+              Production variance and cost snapshots are captured on each production record. Use
+              production details for component stock movement and journal links.
             </p>
           </div>
         </section>

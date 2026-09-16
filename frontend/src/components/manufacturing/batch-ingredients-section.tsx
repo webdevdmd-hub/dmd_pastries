@@ -48,7 +48,7 @@ export function BatchIngredientsSection({
         <div>
           <h2 className="text-sm font-semibold text-foreground">Components Consumed</h2>
           <p className="mt-1 text-sm text-foreground-muted">
-            Backend-generated ingredient and material stock-out rows for this production.
+            Ingredients and materials taken out of stock for this production.
           </p>
         </div>
       </div>
