@@ -2,7 +2,7 @@
 
 import { AlertCircle, Loader2 } from "lucide-react";
 import type { JSX } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { SupplierLookupSelect } from "@/components/purchasing/supplier-lookup-select";
@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError } from "@/lib/api/client";
+import { shouldDiscardAllocations } from "@/lib/purchasing/payment-allocation-reset";
 import { supplierPaymentErrorMessage } from "@/lib/purchasing/supplier-payment-errors";
 import type {
   CreateSupplierPaymentPayload,
@@ -159,8 +160,23 @@ export function PurchaseSupplierPaymentAllocationDialog({
     { key: "bills", label: "Bills", badge: billsWithAllocation },
   ];
 
+  // Which payment the fields currently hold, so a background refetch of the
+  // same payment does not overwrite what the operator is typing, and the
+  // arrival of the payment (the first open renders before it loads) does.
+  const prefilledFor = useRef<string | null>(null);
+  // The supplier the allocations belong to. Null until something is held.
+  const allocationsHeldFor = useRef<string | null>(null);
+
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      prefilledFor.current = null;
+      allocationsHeldFor.current = null;
+      return;
+    }
+    const paymentId = initialPayment?.id ?? "";
+    if (prefilledFor.current === paymentId) return;
+    prefilledFor.current = paymentId;
+    allocationsHeldFor.current = initialPayment?.supplierId ?? selectedSupplierId;
 
     setPaymentMethodId(initialPayment?.paymentMethodId ?? "");
     setAmount(initialPayment ? String(initialPayment.amount) : "0");
@@ -183,9 +199,15 @@ export function PurchaseSupplierPaymentAllocationDialog({
     setRowErrors({});
     // Every opening starts on Payment, whichever tab the last one closed on.
     setActiveTab("payment");
-  }, [initialPayment, open]);
+  }, [initialPayment, open, selectedSupplierId]);
 
+  // Allocations name one supplier's bills, so another supplier's selection
+  // discards them. Opening the form is NOT such a change: it assigns the
+  // supplier the prefilled allocations already belong to.
   useEffect(() => {
+    if (!shouldDiscardAllocations(allocationsHeldFor.current, selectedSupplierId)) return;
+
+    allocationsHeldFor.current = selectedSupplierId;
     setAllocations({});
     setSubmitError(null);
     setRowErrors({});
