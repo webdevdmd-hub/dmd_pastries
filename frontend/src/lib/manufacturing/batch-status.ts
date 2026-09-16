@@ -24,7 +24,7 @@ export function batchWastageRemaining(
  * Wastage writes off finished goods, so it needs a produced batch with output
  * left. It used to be offered on every non-planned batch -- in practice only
  * completed ones -- while the server accepted only planned and in-progress
- * batches, so it could never succeed. (ISSUE-043)
+ * batches, so it could never succeed. (ISSUE-044)
  */
 export function canRecordBatchWastage(
   batch: Pick<ProductionBatch, "status" | "producedQuantity" | "wastageQuantity">,

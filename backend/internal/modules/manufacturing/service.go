@@ -461,7 +461,7 @@ func (s *Service) ProduceBatch(currentUser *utils.AuthContext, id string, req Pr
 // Dr 5080 Wastage Expense / Cr 1200 Inventory, and adds it to the batch's
 // wastage total.
 //
-// Regression: ISSUE-043 — "Record wastage" could never succeed. The action was
+// Regression: ISSUE-044 — "Record wastage" could never succeed. The action was
 // offered only on completed batches, this refused everything but planned and
 // in-progress ones, and when it did accept a request it stored a bare number:
 // no stock left the shelf and nothing was expensed. Owner decision 2026-09-16:
@@ -620,7 +620,7 @@ func (s *Service) GetWastage(currentUser *utils.AuthContext, id string) (*Produc
 	// The Wastage tab reads "wastage": one row per wastage movement, component
 	// loss at production and finished goods written off afterwards. It had
 	// nothing to read before -- the response carried no list, so the tab
-	// failed with "Backend list payload is invalid." (ISSUE-043)
+	// failed with "Backend list payload is invalid." (ISSUE-044)
 	movements, err := s.repo.BatchWastageMovements(s.db, currentUser.BusinessID, batch.ID)
 	if err != nil {
 		return nil, err
@@ -829,7 +829,7 @@ func (s *Service) completeBatchTx(tx *gorm.DB, currentUser *utils.AuthContext, i
 	total := roundMoney(ingredientCost + packagingCost)
 	completion := map[string]interface{}{"status": "completed", "production_date": productionDate, "produced_quantity": producedQuantity, "completed_at": now, "completed_by_user_id": currentUser.UserID, "ingredient_cost": ingredientCost, "packaging_cost": packagingCost, "total_production_cost": total, "cost_per_unit": roundQuantity(total / producedQuantity), "wastage_quantity": wastageQuantity, "wastage_reason": wastageReason, "notes": notes, "updated_by_user_id": currentUser.UserID, "updated_at": now}
 	// "Produce now" and "Produce planned" never pass through Start, so the batch
-	// showed "Start time: Not set" once it was finished. (ISSUE-042)
+	// showed "Start time: Not set" once it was finished. (ISSUE-043)
 	if batch.StartedAt == nil {
 		completion["started_at"] = now
 	}
@@ -1629,7 +1629,7 @@ func validateListQuery(query BatchListQuery) error {
 // is left unrounded so the stock-in total -- unit cost times quantity, rounded
 // to cents -- equals what production consumed.
 //
-// Regression: ISSUE-041 — it was rounded to cents first. 100.00 of components
+// Regression: ISSUE-042 — it was rounded to cents first. 100.00 of components
 // making 3 cakes entered stock at 33.33 each, 99.99 in total; the batch journal
 // moved 100.00 into Work in Process and 99.99 out, and the cent stayed in 1210
 // for good. A small unit cost lost everything: 1.00 across 1,000 biscuits

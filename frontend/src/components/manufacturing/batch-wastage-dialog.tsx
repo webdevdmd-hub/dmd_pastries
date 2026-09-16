@@ -22,7 +22,7 @@ import type { ProductionBatch, WastagePayload } from "@/types/manufacturing";
  * Writes off finished goods from a produced batch. The server takes them out
  * of stock and posts the cost to Wastage Expense, so the dialog names what is
  * being written off and how much is left, instead of the old free item picker
- * and "wastage type" text box, which the server ignored. (ISSUE-043)
+ * and "wastage type" text box, which the server ignored. (ISSUE-044)
  */
 export function BatchWastageDialog({
   batch,

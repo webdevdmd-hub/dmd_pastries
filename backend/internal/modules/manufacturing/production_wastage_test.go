@@ -8,7 +8,7 @@ import (
 	"pastries-pos/internal/shared/money"
 )
 
-// Regression: ISSUE-041 — finished goods entered stock at a unit cost rounded to cents.
+// Regression: ISSUE-042 — finished goods entered stock at a unit cost rounded to cents.
 //
 // completeBatchTx divided what production consumed by the quantity made and
 // rounded to cents before valuing the output. The batch journal debits Work in
@@ -42,7 +42,7 @@ func TestFinishedGoodsEnterStockAtWhatProductionConsumed(t *testing.T) {
 	}
 }
 
-// Regression: ISSUE-043 — "Record wastage" on a batch could never succeed.
+// Regression: ISSUE-044 — "Record wastage" on a batch could never succeed.
 //
 // On production on 2026-09-16 the batch menu offered it only on completed
 // batch MFG-000001, and the server answered "only planned or in_progress
@@ -102,7 +102,7 @@ func TestWastageRequestReadsReason(t *testing.T) {
 	}
 }
 
-// Regression: ISSUE-042 — a batch produced in one step showed "Start time: Not set".
+// Regression: ISSUE-043 — a batch produced in one step showed "Start time: Not set".
 func TestProducingABatchRecordsItsStartTime(t *testing.T) {
 	body := manufacturingFunctionBody(t, "func (s *Service) completeBatchTx(")
 	if !strings.Contains(body, "if batch.StartedAt == nil {\n\t\tcompletion[\"started_at\"] = now\n\t}") {

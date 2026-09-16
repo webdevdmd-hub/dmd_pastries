@@ -47,7 +47,7 @@ func TestBakeryOrderMovementsNameTheirRealSource(t *testing.T) {
 			mustNot:     "Sales Return",
 		},
 		{
-			// ISSUE-043: finished goods written off from a batch after production.
+			// ISSUE-044: finished goods written off from a batch after production.
 			name:        "a batch write-off names the batch and why",
 			movement:    StockMovement{MovementType: "wastage", ReferenceType: "production_wastage", ReferenceNumber: "MFG-000003", Reason: "Dropped"},
 			wantContain: "Written off from Production Batch #MFG-000003",

@@ -2,7 +2,7 @@
  * "Record wastage" on a production batch writes off finished goods, and is
  * offered only where it can succeed.
  *
- * Measured on production on 2026-09-16 (ISSUE-043): the action appeared only on
+ * Measured on production on 2026-09-16 (ISSUE-044): the action appeared only on
  * completed batch MFG-000001, and the server answered "only planned or
  * in_progress batches can record wastage". The dialog asked for an inventory
  * item and a free-text "wastage type" the server ignored, and sent the reason
