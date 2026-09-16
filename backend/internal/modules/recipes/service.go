@@ -76,6 +76,12 @@ func (s *Service) Create(currentUser *utils.AuthContext, req CreateRecipeRequest
 		if err := s.repo.CreateRecipe(tx, recipe, ingredients, packaging); err != nil {
 			return err
 		}
+		// "Save & activate" on a new recipe is activation too.
+		if recipe.IsActive {
+			if err := s.recalculateCost(tx, currentUser.BusinessID, branchID, recipe.ID); err != nil {
+				return err
+			}
+		}
 		if err := s.audit(tx, currentUser, "recipe.created", recipe.ID, "Recipe created", ipAddress, userAgent); err != nil {
 			return err
 		}
@@ -200,6 +206,13 @@ func (s *Service) UpdateStatus(currentUser *utils.AuthContext, id string, req Up
 		}
 		if err := s.repo.UpdateRecipe(tx, id, currentUser.BusinessID, branchID, map[string]interface{}{"status": req.Status, "is_active": req.Status == "active", "updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}); err != nil {
 			return err
+		}
+		// Activating is the moment a recipe starts driving its product's cost
+		// and, with automatic price updates, its price.
+		if req.Status == "active" {
+			if err := s.recalculateCost(tx, currentUser.BusinessID, branchID, id); err != nil {
+				return err
+			}
 		}
 		return s.audit(tx, currentUser, "recipe.status_updated", id, "Recipe status updated", ipAddress, userAgent)
 	})
@@ -923,6 +936,9 @@ func (s *Service) recalculateCost(tx *gorm.DB, businessID, branchID, recipeID st
 	if s.pricingService == nil || recipe.ProductID == "" || costPerYieldUnit <= 0 {
 		return nil
 	}
+	if !recipeDrivesProductPrice(recipe) {
+		return nil
+	}
 	return s.pricingService.ApplyRecipeCostUpdate(tx, products.PricingCostSource{
 		BusinessID:       businessID,
 		BranchID:         branchID,
@@ -934,6 +950,22 @@ func (s *Service) recalculateCost(tx *gorm.DB, businessID, branchID, recipeID st
 		SourceNumber:     recipe.RecipeCode,
 		Reason:           "Recipe cost recalculated from BOM",
 	})
+}
+
+// recipeDrivesProductPrice reports whether a recipe's cost may reach its
+// product. Only the active recipe describes how the product is really made.
+//
+// Every recipe edit -- adding, changing or removing a line, "Refresh saved
+// cost" -- recalculated the cost and passed it to the product's pricing,
+// whatever the recipe's status. With automatic price updates on, a DRAFT
+// changed the live POS price. Measured on production on 2026-09-16: refreshing
+// the cost of draft RCP-000001 moved Vanilla Cake from AED 357.14 to AED 385.71
+// at the till, for a recipe that had never been activated.
+//
+// Regression: ISSUE-040 — editing a draft recipe changed the live selling price
+// Found by /qa on 2026-09-16
+func recipeDrivesProductPrice(recipe *Recipe) bool {
+	return recipe != nil && recipe.IsActive && recipe.Status == "active"
 }
 
 type recipeComponent struct {
