@@ -203,18 +203,25 @@ func (s *Service) Update(currentUser *utils.AuthContext, id string, req UpdateEx
 		updated.UpdatedByUserID = &currentUser.UserID
 		updated.UpdatedAt = now
 
-		if accountingChanged {
+		journalLive, err := s.repo.JournalIsLive(tx, currentUser.BusinessID, existing.JournalEntryID)
+		if err != nil {
+			return err
+		}
+		plan := expenseJournalPlan(accountingChanged, journalLive)
+		if plan.ReverseCurrent {
 			reversalID, err := s.postReversalJournal(tx, currentUser, *existing, "expense_update_reversal")
 			if err != nil {
 				return err
 			}
 			updated.ReversalJournalEntryID = &reversalID
+			updates["reversal_journal_entry_id"] = reversalID
+		}
+		if plan.PostNew {
 			newEntryID, err := s.postExpenseJournal(tx, currentUser, updated, "expense", nil)
 			if err != nil {
 				return err
 			}
 			updated.JournalEntryID = &newEntryID
-			updates["reversal_journal_entry_id"] = reversalID
 			updates["journal_entry_id"] = newEntryID
 		}
 
@@ -291,6 +298,29 @@ func (s *Service) Delete(currentUser *utils.AuthContext, id string, ipAddress, u
 			UserAgent: userAgent,
 		})
 	})
+}
+
+type journalPlan struct {
+	ReverseCurrent bool
+	PostNew        bool
+}
+
+// expenseJournalPlan decides what an edit does to the ledger.
+//
+//   - Accounting fields changed and the journal is live: reverse it, post anew.
+//   - The journal is NOT live (reversed or missing): post anew and reverse
+//     nothing. Reversing a journal that is already reversed would take the
+//     amount out of the ledger a second time; this is exactly the state
+//     ISSUE-035 left expenses in, so any save now repairs them.
+//   - Nothing accounting-related changed and the journal is live: leave it.
+func expenseJournalPlan(accountingChanged, journalLive bool) journalPlan {
+	if !journalLive {
+		return journalPlan{PostNew: true}
+	}
+	if accountingChanged {
+		return journalPlan{ReverseCurrent: true, PostNew: true}
+	}
+	return journalPlan{}
 }
 
 func expenseChanges(existing, updated Expense) []audit.AuditChange {
@@ -570,6 +600,14 @@ func (s *Service) postExpenseJournal(tx *gorm.DB, currentUser *utils.AuthContext
 func (s *Service) postReversalJournal(tx *gorm.DB, currentUser *utils.AuthContext, expense Expense, sourceType string) (string, error) {
 	if expense.JournalEntryID == nil || *expense.JournalEntryID == "" {
 		return "", apperrors.BadRequest("expense has no journal entry to reverse", nil)
+	}
+	live, err := s.repo.JournalIsLive(tx, expense.BusinessID, expense.JournalEntryID)
+	if err != nil {
+		return "", err
+	}
+	if !live {
+		// Reversing it again would remove the amount from the ledger twice.
+		return "", apperrors.Conflict("this expense's journal is already reversed", map[string]interface{}{"reason": "expense_journal_already_reversed"})
 	}
 	// The binding date is the ORIGINAL journal's — reversing it mutates
 	// locked history (Phase 5 hard-block).
