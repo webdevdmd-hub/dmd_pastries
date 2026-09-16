@@ -3943,6 +3943,8 @@ func (s *Service) recalculatePurchaseReturnTotals(tx *gorm.DB, businessID, retur
 func (s *Service) orderResponse(businessID string, order PurchaseOrder, includeItems bool) PurchaseOrderResponse {
 	branchName, supplierName := s.repo.NameLookups(businessID, order.BranchID, order.SupplierID)
 	response := PurchaseOrderResponse{ID: order.ID, BusinessID: order.BusinessID, BranchID: order.BranchID, BranchName: branchName, SupplierID: order.SupplierID, SupplierName: supplierName, PurchaseOrderNumber: order.PurchaseOrderNumber, OrderDate: order.OrderDate, ExpectedDeliveryDate: order.ExpectedDeliveryDate, Status: order.Status, SubtotalAmount: roundMoney(order.SubtotalAmount), TaxAmount: roundMoney(order.TaxAmount), ChargeAmount: roundMoney(order.ChargeAmount), ChargeTaxAmount: roundMoney(order.ChargeTaxAmount), DiscountAmount: roundMoney(order.DiscountAmount), TotalAmount: roundMoney(order.TotalAmount), Notes: order.Notes, CreatedAt: order.CreatedAt, UpdatedAt: order.UpdatedAt}
+	response.CreatedByUserID = order.CreatedByUserID
+	response.CreatedByUserName = s.repo.UserName(businessID, order.CreatedByUserID)
 	if includeItems {
 		items, _ := s.repo.OrderItems(order.ID, businessID)
 		for _, item := range items {
@@ -3979,6 +3981,8 @@ func (s *Service) purchaseInvoiceNumber(businessID string, invoiceID *string) st
 func (s *Service) invoiceResponse(businessID string, invoice PurchaseInvoice, includeItems bool) PurchaseInvoiceResponse {
 	branchName, supplierName := s.repo.NameLookups(businessID, invoice.BranchID, invoice.SupplierID)
 	response := PurchaseInvoiceResponse{ID: invoice.ID, BusinessID: invoice.BusinessID, BranchID: invoice.BranchID, BranchName: branchName, SupplierID: invoice.SupplierID, SupplierName: supplierName, PurchaseOrderID: invoice.PurchaseOrderID, PurchaseOrderNumber: s.purchaseOrderNumber(businessID, invoice.PurchaseOrderID), InvoiceNumber: invoice.InvoiceNumber, SupplierBillNumber: invoice.SupplierBillNumber, InvoiceDate: invoice.InvoiceDate, DueDate: invoice.DueDate, Status: invoice.Status, PaymentStatus: invoice.PaymentStatus, SubtotalAmount: roundMoney(invoice.SubtotalAmount), TaxAmount: roundMoney(invoice.TaxAmount), ChargeAmount: roundMoney(invoice.ChargeAmount), ChargeTaxAmount: roundMoney(invoice.ChargeTaxAmount), DiscountAmount: roundMoney(invoice.DiscountAmount), BillDiscountAmount: roundMoney(invoice.BillDiscountAmount), TotalAmount: roundMoney(invoice.TotalAmount), PaidAmount: roundMoney(invoice.PaidAmount), BalanceAmount: roundMoney(invoice.BalanceAmount), ReturnedAmount: roundMoney(invoice.ReturnedAmount), CreditedAmount: roundMoney(invoice.CreditedAmount), ReturnStatus: invoice.ReturnStatus, JournalEntryID: invoice.JournalEntryID, CancelledByUserID: invoice.CancelledByUserID, CancelledAt: invoice.CancelledAt, CancelReason: invoice.CancelReason, ReversalJournalEntryID: invoice.ReversalJournalEntryID, CancelledReceiptID: invoice.CancelledReceiptID, Notes: invoice.Notes, CreatedAt: invoice.CreatedAt, UpdatedAt: invoice.UpdatedAt}
+	response.CreatedByUserID = invoice.CreatedByUserID
+	response.CreatedByUserName = s.repo.UserName(businessID, invoice.CreatedByUserID)
 	items, _ := s.repo.InvoiceItems(invoice.ID, businessID)
 	receiveLines, receiveStatus, canReceive := s.invoiceReceiveState(businessID, invoice, items)
 	response.ReceiveStatus = receiveStatus
@@ -4188,6 +4192,7 @@ func (s *Service) purchaseReturnResponse(businessID string, purchaseReturn Purch
 		ReversedByUserID:           purchaseReturn.ReversedByUserID,
 		ReversedAt:                 purchaseReturn.ReversedAt,
 		CreatedByUserID:            purchaseReturn.CreatedByUserID,
+		CreatedByUserName:          s.repo.UserName(businessID, purchaseReturn.CreatedByUserID),
 		PostedByUserID:             purchaseReturn.PostedByUserID,
 		PostedAt:                   purchaseReturn.PostedAt,
 		CancelledByUserID:          purchaseReturn.CancelledByUserID,
@@ -4408,6 +4413,7 @@ func receiptAccountingStateFromInvoice(receipt PurchaseReceipt, invoice *receipt
 func (s *Service) receiptResponse(businessID string, receipt PurchaseReceipt, includeItems bool, accountingState receiptAccountingState) PurchaseReceiptResponse {
 	branchName, supplierName := s.repo.NameLookups(businessID, receipt.BranchID, receipt.SupplierID)
 	response := PurchaseReceiptResponse{ID: receipt.ID, BusinessID: receipt.BusinessID, BranchID: receipt.BranchID, BranchName: branchName, SupplierID: receipt.SupplierID, SupplierName: supplierName, PurchaseOrderID: receipt.PurchaseOrderID, PurchaseOrderNumber: first(receipt.PurchaseOrderNumber, s.purchaseOrderNumber(businessID, receipt.PurchaseOrderID)), PurchaseInvoiceID: receipt.PurchaseInvoiceID, PurchaseInvoiceNumber: first(receipt.PurchaseInvoiceNumber, s.purchaseInvoiceNumber(businessID, receipt.PurchaseInvoiceID)), ReceiptNumber: receipt.ReceiptNumber, ReceivedDate: receipt.ReceivedDate, Status: receipt.Status, ChargeAmount: roundMoney(receipt.ChargeAmount), ChargeTaxAmount: roundMoney(receipt.ChargeTaxAmount), JournalEntryID: receipt.JournalEntryID, AccountingStatus: accountingState.Status, AccountingStatusLabel: accountingState.Label, AccountingStatusDetail: accountingState.Detail, LinkedBillStatus: accountingState.LinkedBillStatus, LinkedBillJournalEntryID: accountingState.LinkedBillJournalEntryID, ReceivedByUserID: receipt.ReceivedByUserID, Notes: receipt.Notes, CreatedAt: receipt.CreatedAt, UpdatedAt: receipt.UpdatedAt}
+	response.ReceivedByUserName = s.repo.UserName(businessID, receipt.ReceivedByUserID)
 	if includeItems {
 		items, _ := s.repo.ReceiptItems(receipt.ID, businessID)
 		for _, item := range items {
