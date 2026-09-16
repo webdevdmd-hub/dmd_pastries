@@ -13,6 +13,7 @@ import {
 } from "@/components/manufacturing/batch-detail-tabs";
 import { BatchDetailsPanel } from "@/components/manufacturing/batch-details-panel";
 import { BatchHeader } from "@/components/manufacturing/batch-header";
+import { BatchProduceConfirmDialog } from "@/components/manufacturing/batch-produce-confirm-dialog";
 import { BatchWastageDialog } from "@/components/manufacturing/batch-wastage-dialog";
 import { ManufacturingErrorState } from "@/components/manufacturing/manufacturing-error-state";
 import { ManufacturingTableSkeleton } from "@/components/manufacturing/manufacturing-table-skeleton";
@@ -36,6 +37,7 @@ import type { WastagePayload } from "@/types/manufacturing";
 export function BatchDetailsPageClient({ batchId }: { batchId: string }): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const [wastageOpen, setWastageOpen] = useState(false);
+  const [produceOpen, setProduceOpen] = useState(false);
   const canView = hasAnyPermission([PERMISSIONS.manufacturingView]);
   const canProduce = hasAnyPermission([PERMISSIONS.manufacturingBatchesProduce]);
   const canRecordWastage = hasAnyPermission([PERMISSIONS.manufacturingBatchesWastage]);
@@ -129,9 +131,7 @@ export function BatchDetailsPageClient({ batchId }: { batchId: string }): JSX.El
         canProduce={canProduce}
         canRecordWastage={canRecordWastage}
         isProducing={produceBatchMutation.isPending}
-        onProduce={() => {
-          void handleProducePlanned();
-        }}
+        onProduce={() => setProduceOpen(true)}
         onRecordWastage={() => setWastageOpen(true)}
       />
 
@@ -143,6 +143,15 @@ export function BatchDetailsPageClient({ batchId }: { batchId: string }): JSX.El
         outputs={outputsQuery.data ?? []}
         packaging={packagingQuery.data ?? []}
         wastage={wastageQuery.data ?? []}
+      />
+
+      <BatchProduceConfirmDialog
+        batch={produceOpen ? batch : null}
+        isProducing={produceBatchMutation.isPending}
+        onClose={() => setProduceOpen(false)}
+        onConfirm={() => {
+          void handleProducePlanned().then(() => setProduceOpen(false));
+        }}
       />
 
       <BatchWastageDialog

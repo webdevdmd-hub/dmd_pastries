@@ -56,16 +56,34 @@ export function BatchWastageDialog({
     ? `${batch.productName}${batch.productVariantName ? ` - ${batch.productVariantName}` : ""}`
     : "";
 
-  const submit = async (): Promise<void> => {
+  const validate = (): WastagePayload | null => {
     const result = batchWastageSchema(remaining, unit).safeParse({ quantity, reason });
 
     if (!result.success) {
       setError(result.error.issues[0]?.message ?? "Please check the wastage details.");
-      return;
+      return null;
     }
 
     setError(null);
-    await onWastage(result.data);
+    return result.data;
+  };
+
+  // Once an error is showing, re-check as the fields change, so correcting
+  // the quantity clears "Only 1 pcs ..." instead of leaving it until the next
+  // submit. (ISSUE-045)
+  const errorShown = error !== null;
+  useEffect(() => {
+    if (errorShown) {
+      validate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-check on field changes only
+  }, [quantity, reason]);
+
+  const submit = async (): Promise<void> => {
+    const payload = validate();
+    if (payload) {
+      await onWastage(payload);
+    }
   };
 
   return (

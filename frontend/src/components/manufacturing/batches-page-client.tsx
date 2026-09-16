@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { AccessDeniedCard } from "@/components/manufacturing/access-denied-card";
 import { BatchDetailsDrawer } from "@/components/manufacturing/batch-details-drawer";
 import { BatchFormDialog } from "@/components/manufacturing/batch-form-dialog";
+import { BatchProduceConfirmDialog } from "@/components/manufacturing/batch-produce-confirm-dialog";
 import { BatchWastageDialog } from "@/components/manufacturing/batch-wastage-dialog";
 import { BatchesCardGrid } from "@/components/manufacturing/batches-card-grid";
 import { BatchesTable } from "@/components/manufacturing/batches-table";
@@ -88,6 +89,7 @@ export function BatchesPageClient(): JSX.Element {
   const [wastageBatch, setWastageBatch] = useState<ProductionBatch | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [producingBatchId, setProducingBatchId] = useState<string | null>(null);
+  const [produceTarget, setProduceTarget] = useState<ProductionBatch | null>(null);
   // The record, not the id: the list rows already carry a full batch, so the
   // drawer only fetches its four component lists.
   const [drawerBatch, setDrawerBatch] = useState<ProductionBatch | null>(null);
@@ -153,6 +155,13 @@ export function BatchesPageClient(): JSX.Element {
   const askDelete = (batch: ProductionBatch): void => {
     setDrawerBatch(null);
     setDeleteBatchTarget(batch);
+  };
+
+  // Producing cannot be undone, so every "Produce planned" opens the review
+  // step first instead of producing on the click. (ISSUE-046)
+  const askProduce = (batch: ProductionBatch): void => {
+    setDrawerBatch(null);
+    setProduceTarget(batch);
   };
 
   const openWastage = (batch: ProductionBatch): void => {
@@ -267,9 +276,7 @@ export function BatchesPageClient(): JSX.Element {
     canRecordWastage,
     onDelete: askDelete,
     onEdit: openEdit,
-    onProduce: (batch: ProductionBatch) => {
-      void handleProducePlannedFromRow(batch);
-    },
+    onProduce: askProduce,
     onView: setDrawerBatch,
     onWastage: openWastage,
     producingBatchId,
@@ -441,9 +448,7 @@ export function BatchesPageClient(): JSX.Element {
         isProducing={producingBatchId === drawerBatch?.id}
         onDelete={askDelete}
         onOpenChange={(open) => (!open ? setDrawerBatch(null) : undefined)}
-        onProduce={(batch) => {
-          void handleProducePlannedFromRow(batch);
-        }}
+        onProduce={askProduce}
         onWastage={openWastage}
         open={drawerBatch !== null}
       />
@@ -468,6 +473,15 @@ export function BatchesPageClient(): JSX.Element {
         onUpdate={handleUpdate}
         open={formOpen}
         products={productsQuery.data ?? []}
+      />
+
+      <BatchProduceConfirmDialog
+        batch={produceTarget}
+        isProducing={producingBatchId !== null}
+        onClose={() => setProduceTarget(null)}
+        onConfirm={(batch) => {
+          void handleProducePlannedFromRow(batch).then(() => setProduceTarget(null));
+        }}
       />
 
       <BatchWastageDialog
