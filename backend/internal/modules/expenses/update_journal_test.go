@@ -75,6 +75,65 @@ func TestExpenseUpdateAndReversalGuardTheLedger(t *testing.T) {
 	}
 }
 
+// Regression: ISSUE-035, second measurement. The first fix made the lookup
+// ignore reversed journals, and on production the next save returned 500:
+//
+//	duplicate key value violates unique constraint
+//	"idx_journal_entries_unique_source_posted"
+//
+// That index allows one journal per (business, source type, source id) among
+// posted AND reversed journals. A replacement keyed (expense, expense id) always
+// collides with the journal it replaces, and a reversal keyed to the expense
+// could happen once per expense. The accounting module keys a reversal to the
+// journal it reverses; expenses now do the same, and key a replacement to the
+// journal it replaces.
+func TestExpenseJournalsAreKeyedSoEditsNeverCollide(t *testing.T) {
+	expenseID := "expense-1"
+	first := "journal-1"
+
+	if typ, id := expenseReplacementSource(Expense{ID: expenseID}); typ != "expense" || id != expenseID {
+		t.Errorf("an expense with no journal posts its first one as (expense, expense id), got (%s, %s)", typ, id)
+	}
+	typ, id := expenseReplacementSource(Expense{ID: expenseID, JournalEntryID: &first})
+	if typ != "expense_edit" || id != first {
+		t.Errorf("a replacement must be keyed to the journal it replaces, got (%s, %s); keying it to the "+
+			"expense collides with the index on every edit", typ, id)
+	}
+
+	reversal := expenseFunctionBody(t, "service.go", "func (s *Service) postReversalJournal(")
+	if !strings.Contains(reversal, "sourceID := *expense.JournalEntryID") {
+		t.Error("a reversal must be keyed to the journal it reverses; keyed to the expense, the second edit's " +
+			"reversal fails on the unique index")
+	}
+
+	update := expenseFunctionBody(t, "service.go", "func (s *Service) Update(")
+	if !strings.Contains(update, "expenseReplacementSource(") {
+		t.Error("Update must key its replacement journal with expenseReplacementSource")
+	}
+}
+
+// Delete removes every journal an expense ever had. With reversals and
+// replacements keyed to journals, only the first is keyed to the expense, so the
+// lookup must follow the chain -- or an edited expense's later journals stay in
+// the ledger after it is deleted.
+func TestDeleteFindsEveryJournalInTheChain(t *testing.T) {
+	body := expenseFunctionBody(t, "repository.go", "func (r *Repository) ListExpenseJournalEntryIDs(")
+	if !strings.Contains(body, "for len(frontier) > 0") || !strings.Contains(body, "source_id IN ?") {
+		t.Error("ListExpenseJournalEntryIDs must follow source ids outward from the expense; a single lookup " +
+			"by expense id misses every journal posted by an edit")
+	}
+	raw, err := os.ReadFile("repository.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	types := string(raw)[strings.Index(string(raw), "var expenseJournalSourceTypes"):]
+	for _, want := range []string{"SourceExpense,", "SourceExpenseEdit,", "SourceExpenseUpdateReversal,"} {
+		if !strings.Contains(types[:strings.Index(types, "}")], want) {
+			t.Errorf("expenseJournalSourceTypes must include %s", want)
+		}
+	}
+}
+
 func expenseFunctionBody(t *testing.T, file, marker string) string {
 	t.Helper()
 	raw, err := os.ReadFile(file)
