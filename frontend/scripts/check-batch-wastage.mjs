@@ -30,7 +30,7 @@ const transpiled = ts.transpileModule(read("src/lib/manufacturing/batch-status.t
 });
 const moduleState = { exports: {} };
 new Function("exports", "module", transpiled.outputText)(moduleState.exports, moduleState);
-const { batchWastageRemaining, canRecordBatchWastage } = moduleState.exports;
+const { batchWastageRemaining, canRecordBatchWastage, producePlannedBlocked } = moduleState.exports;
 
 assert.equal(
   typeof canRecordBatchWastage,
@@ -111,6 +111,53 @@ assert.match(
   /referenceType === "production_wastage"[\s\S]{0,120}Written off from Production Batch/,
   "a write-off must name its batch in the stock ledger",
 );
+
+// ISSUE-045: after a failed submit, the error must follow the fields.
+assert.match(
+  dialog,
+  /useEffect\(\(\) => \{\s*if \(errorShown\) \{\s*validate\(\);/,
+  "the wastage dialog must re-check once an error is showing, or a corrected quantity keeps the old error",
+);
+
+// ISSUE-046: "Produce planned" produced on one click, and a produced batch
+// cannot be cancelled or deleted. Every entry point opens a review first.
+assert.equal(
+  typeof producePlannedBlocked,
+  "function",
+  "batch-status must gate the produce confirmation",
+);
+const ready = {
+  isError: false,
+  isLoading: false,
+  isProducing: false,
+  preview: { hasShortage: false },
+};
+assert.equal(producePlannedBlocked(ready), false, "a checked batch with stock can be produced");
+assert.equal(producePlannedBlocked({ ...ready, isLoading: true, preview: undefined }), true);
+assert.equal(producePlannedBlocked({ ...ready, isError: true }), true);
+assert.equal(producePlannedBlocked({ ...ready, isProducing: true }), true, "no double submit");
+assert.equal(
+  producePlannedBlocked({ ...ready, preview: { hasShortage: true } }),
+  true,
+  "a short component blocks producing",
+);
+
+const batchesPage = read("src/components/manufacturing/batches-page-client.tsx");
+assert.doesNotMatch(
+  batchesPage,
+  /onProduce[^\n]*\{\s*void handleProducePlannedFromRow/,
+  "the row menu or drawer produces on the click again",
+);
+assert.match(batchesPage, /onProduce: askProduce/, "the row menu must open the review");
+assert.match(batchesPage, /onProduce=\{askProduce\}/, "the drawer must open the review");
+assert.match(batchesPage, /<BatchProduceConfirmDialog/);
+const detailsPage = read("src/components/manufacturing/batch-details-page-client.tsx");
+assert.match(
+  detailsPage,
+  /onProduce=\{\(\) => setProduceOpen\(true\)\}/,
+  "the batch page must open the review",
+);
+assert.match(detailsPage, /<BatchProduceConfirmDialog/);
 
 console.log(
   "check-batch-wastage: wastage is offered on produced batches and sends what the server reads.",

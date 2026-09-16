@@ -1,4 +1,4 @@
-import type { BatchStatus, ProductionBatch } from "@/types/manufacturing";
+import type { BatchStatus, ProductionBatch, ProductionPreview } from "@/types/manufacturing";
 
 export function isBatchProduceEligible(status: BatchStatus): boolean {
   return status === "draft" || status === "planned" || status === "in_progress";
@@ -10,6 +10,26 @@ export function isBatchPlannedStatus(status: BatchStatus): boolean {
 
 export function canProduceBatch(batch: ProductionBatch): boolean {
   return isBatchProduceEligible(batch.status) && batch.producedQuantity <= 0;
+}
+
+/**
+ * Whether the confirm button before "Produce planned" stays disabled: until the
+ * stock and cost check has loaded, when it failed, while producing, and when
+ * a component is short. (ISSUE-046)
+ */
+export function producePlannedBlocked(state: {
+  isError: boolean;
+  isLoading: boolean;
+  isProducing: boolean;
+  preview: Pick<ProductionPreview, "hasShortage"> | undefined;
+}): boolean {
+  return (
+    state.isLoading ||
+    state.isError ||
+    state.isProducing ||
+    state.preview === undefined ||
+    state.preview.hasShortage
+  );
 }
 
 /** Finished goods from a batch that can still be written off. */
