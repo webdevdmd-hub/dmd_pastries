@@ -46,6 +46,7 @@
     "test:permission-fallbacks": "node scripts/check-permission-fallbacks.mjs",
     "test:form-control-wraps-input": "node scripts/check-form-control-wraps-input.mjs",
     "test:font-weight": "node scripts/check-font-weight.mjs",
+    "test:order-next-step": "node scripts/check-order-next-step.mjs",
     "test:order-status-rules": "node scripts/check-order-status-rules.mjs",
     "test:error-message-details": "node scripts/check-error-message-details.mjs",
     "test:movement-type-labels": "node scripts/check-movement-type-labels.mjs",

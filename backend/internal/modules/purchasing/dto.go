@@ -270,12 +270,20 @@ type PaginatedResponse[T any] struct {
 }
 
 type PurchaseOrderResponse struct {
-	ID                   string                      `json:"id"`
-	BusinessID           string                      `json:"business_id"`
-	BranchID             string                      `json:"branch_id"`
-	BranchName           string                      `json:"branch_name"`
-	CreatedByUserID      string                      `json:"created_by_user_id"`
-	CreatedByUserName    string                      `json:"created_by_user_name"`
+	ID                string `json:"id"`
+	BusinessID        string `json:"business_id"`
+	BranchID          string `json:"branch_id"`
+	BranchName        string `json:"branch_name"`
+	CreatedByUserID   string `json:"created_by_user_id"`
+	CreatedByUserName string `json:"created_by_user_name"`
+	// Receiving and billing state, on the list path too. The list used to carry
+	// no items and no document chain, so a received order that had already been
+	// billed and paid read "Ready to bill", inviting a second bill, and a PO with
+	// 1 of 500 received looked the same as one with 499. (TODOS T-R, ISSUE-033.)
+	StockLineCount       int                         `json:"stock_line_count"`
+	ReceivedLineCount    int                         `json:"received_line_count"`
+	UnreceivedValue      float64                     `json:"unreceived_value"`
+	HasActiveBill        bool                        `json:"has_active_bill"`
 	SupplierID           string                      `json:"supplier_id"`
 	SupplierName         string                      `json:"supplier_name"`
 	PurchaseOrderNumber  string                      `json:"purchase_order_number"`
