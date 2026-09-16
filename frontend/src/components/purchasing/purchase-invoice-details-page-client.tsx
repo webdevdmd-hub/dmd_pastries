@@ -381,9 +381,11 @@ export function PurchaseInvoiceDetailsPageClient({
                 <DropdownMenuContent align="end">
                   {canEditInvoice ? (
                     <DropdownMenuItem
+                      disabled={!invoice.canEdit}
                       onSelect={() => {
                         setEditOpen(true);
                       }}
+                      title={invoice.canEdit ? undefined : invoice.editBlockedReason}
                     >
                       Edit bill
                     </DropdownMenuItem>

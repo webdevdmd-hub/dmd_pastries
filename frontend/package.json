@@ -49,7 +49,7 @@
     "test:order-status-rules": "node scripts/check-order-status-rules.mjs",
     "test:error-message-details": "node scripts/check-error-message-details.mjs",
     "test:movement-type-labels": "node scripts/check-movement-type-labels.mjs",
-    "test:bill-cancel-gate": "node scripts/check-bill-cancel-gate.mjs",
+    "test:bill-action-gates": "node scripts/check-bill-action-gates.mjs",
     "test:draft-bill-delete": "node scripts/check-draft-bill-delete.mjs",
     "test:no-stub-placeholders": "node scripts/check-no-stub-placeholders.mjs",
     "test:payment-stage-label": "node scripts/check-payment-stage-label.mjs",

@@ -146,7 +146,14 @@ function PurchaseInvoiceDetailsDrawerBody({
             </Link>
           </Button>
           {onEdit && invoice.status !== "cancelled" ? (
-            <Button onClick={() => onEdit(invoice)} size="sm" type="button" variant="outline">
+            <Button
+              disabled={!invoice.canEdit}
+              onClick={() => onEdit(invoice)}
+              size="sm"
+              title={invoice.canEdit ? undefined : invoice.editBlockedReason}
+              type="button"
+              variant="outline"
+            >
               <Pencil className="h-4 w-4" />
               Edit bill
             </Button>
