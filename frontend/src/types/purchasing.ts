@@ -195,6 +195,9 @@ export type PurchaseInvoice = {
   /** Advisory hint from the backend; the server still decides on submit. */
   canEdit: boolean;
   editBlockedReason: string;
+  /** Advisory, like canEdit: a paid or credited bill cannot be cancelled. */
+  canCancel: boolean;
+  cancelBlockedReason: string;
   notes: string | null;
   cancelledAt: string | null;
   cancelledByUserId: string | null;

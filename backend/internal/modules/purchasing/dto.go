@@ -381,8 +381,13 @@ type PurchaseInvoiceResponse struct {
 	// transaction; this is derived from figures the response already carries so
 	// a list costs no extra queries. It exists because the menu offered Edit on
 	// a posted, fully received bill that the server would always refuse.
-	CanEdit                bool                             `json:"can_edit"`
-	EditBlockedReason      string                           `json:"edit_blocked_reason"`
+	CanEdit           bool   `json:"can_edit"`
+	EditBlockedReason string `json:"edit_blocked_reason"`
+	// CanCancel mirrors CancelInvoice's refusals the same way, for the same
+	// reason: the menu offered Cancel bill on a paid bill, asked for a
+	// cancellation reason, and the server then always refused.
+	CanCancel              bool                             `json:"can_cancel"`
+	CancelBlockedReason    string                           `json:"cancel_blocked_reason"`
 	JournalEntryID         *string                          `json:"journal_entry_id"`
 	CancelledByUserID      *string                          `json:"cancelled_by_user_id"`
 	CancelledAt            *time.Time                       `json:"cancelled_at"`

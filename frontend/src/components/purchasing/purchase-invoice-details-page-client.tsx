@@ -390,6 +390,8 @@ export function PurchaseInvoiceDetailsPageClient({
                   ) : null}
                   {canCancelInvoice ? (
                     <DropdownMenuItem
+                      disabled={!invoice.canCancel}
+                      title={invoice.canCancel ? undefined : invoice.cancelBlockedReason}
                       className="text-danger-text"
                       onSelect={() => {
                         setCancelReason("");
