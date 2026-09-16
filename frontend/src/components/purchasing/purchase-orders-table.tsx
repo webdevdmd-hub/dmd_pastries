@@ -16,6 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDateOnly } from "@/lib/format/date";
+import { nextStepForOrder } from "@/lib/purchasing/order-next-step";
 import type { PurchaseOrder } from "@/types/purchasing";
 
 export type PurchaseOrdersListProps = PurchaseOrderActionHandlers & {
@@ -36,37 +37,7 @@ export function orderSubline(order: PurchaseOrder): string {
   return [order.branchName, order.createdByUserName].filter(Boolean).join(" · ");
 }
 
-type NextStepPermissions = {
-  canConvertToBill: boolean;
-  canReceiveOrder: boolean;
-  canUpdateStatus: boolean;
-};
-
-/**
- * The next step depends on who is reading it. Without the permission, the
- * cell reports the state instead of instructing an action the menu denies.
- */
-export function nextStepForOrder(order: PurchaseOrder, permissions: NextStepPermissions): string {
-  if (order.status === "draft") {
-    return permissions.canUpdateStatus ? "Mark as issued" : "Awaiting issue";
-  }
-
-  if (order.status === "ordered") {
-    return permissions.canReceiveOrder ? "Receive goods" : "Awaiting delivery";
-  }
-
-  if (order.status === "partially_received") {
-    return permissions.canReceiveOrder ? "Receive remaining goods" : "Part delivered";
-  }
-
-  if (order.status === "received") {
-    // The list response carries no document chain, so this cannot yet tell a
-    // billable order from one that is already billed. See TODOS.md.
-    return permissions.canConvertToBill ? "Ready to bill" : "Received in full";
-  }
-
-  return "No action";
-}
+export { nextStepForOrder } from "@/lib/purchasing/order-next-step";
 
 export function PurchaseOrdersTable({
   onView,

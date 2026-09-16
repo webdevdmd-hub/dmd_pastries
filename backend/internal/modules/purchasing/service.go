@@ -3945,8 +3945,15 @@ func (s *Service) orderResponse(businessID string, order PurchaseOrder, includeI
 	response := PurchaseOrderResponse{ID: order.ID, BusinessID: order.BusinessID, BranchID: order.BranchID, BranchName: branchName, SupplierID: order.SupplierID, SupplierName: supplierName, PurchaseOrderNumber: order.PurchaseOrderNumber, OrderDate: order.OrderDate, ExpectedDeliveryDate: order.ExpectedDeliveryDate, Status: order.Status, SubtotalAmount: roundMoney(order.SubtotalAmount), TaxAmount: roundMoney(order.TaxAmount), ChargeAmount: roundMoney(order.ChargeAmount), ChargeTaxAmount: roundMoney(order.ChargeTaxAmount), DiscountAmount: roundMoney(order.DiscountAmount), TotalAmount: roundMoney(order.TotalAmount), Notes: order.Notes, CreatedAt: order.CreatedAt, UpdatedAt: order.UpdatedAt}
 	response.CreatedByUserID = order.CreatedByUserID
 	response.CreatedByUserName = s.repo.UserName(businessID, order.CreatedByUserID)
+	items, _ := s.repo.OrderItems(order.ID, businessID)
+	summary := orderReceivingSummary(items)
+	response.StockLineCount = summary.StockLines
+	response.ReceivedLineCount = summary.ReceivedLines
+	response.UnreceivedValue = roundMoney(summary.UnreceivedValue)
+	if activeBills, err := s.repo.ActiveInvoiceCountForOrder(s.db, businessID, order.ID); err == nil {
+		response.HasActiveBill = activeBills > 0
+	}
 	if includeItems {
-		items, _ := s.repo.OrderItems(order.ID, businessID)
 		for _, item := range items {
 			unitID := deref(item.UnitID)
 			response.Items = append(response.Items, PurchaseOrderItemResponse{ID: item.ID, LineType: normalizedStoredLineType(item.LineType, item.ItemType, item.AccountID), ItemType: item.ItemType, ProductID: item.ProductID, IngredientID: item.IngredientID, PackagingItemID: item.PackagingItemID, AccountID: item.AccountID, AccountName: item.AccountName, AccountCode: item.AccountCode, Description: item.Description, ItemNameSnapshot: item.ItemNameSnapshot, QuantityOrdered: roundQuantity(item.QuantityOrdered), QuantityReceived: roundQuantity(item.QuantityReceived), UnitID: unitID, UnitSymbol: s.repo.UnitSymbol(unitID), UnitCost: roundMoney(item.UnitCost), DiscountAmount: roundMoney(item.DiscountAmount), TaxRateID: item.TaxRateID, TaxAmount: roundMoney(item.TaxAmount), LineTotal: roundMoney(item.LineTotal)})
@@ -3954,6 +3961,36 @@ func (s *Service) orderResponse(businessID string, order PurchaseOrder, includeI
 		response.Charges, _ = charges.ListChargeResponses(s.db, businessID, "purchase_order", order.ID)
 	}
 	return response
+}
+
+type orderReceiving struct {
+	StockLines      int
+	ReceivedLines   int
+	UnreceivedValue float64
+}
+
+// orderReceivingSummary is the server's copy of purchase-order-quantities.ts:
+// account rows buy an expense and have no received half; what is still owed on
+// a line never goes negative, even on over-receipt; progress is counted in
+// lines, because adding kilograms to litres describes nothing.
+//
+// Regression: ISSUE-033 — a billed and paid purchase order said "Ready to bill"
+// Found by /qa on 2026-09-16
+func orderReceivingSummary(items []PurchaseOrderItem) orderReceiving {
+	var summary orderReceiving
+	for _, item := range items {
+		if normalizedStoredLineType(item.LineType, item.ItemType, item.AccountID) == "account" {
+			continue
+		}
+		summary.StockLines++
+		outstanding := item.QuantityOrdered - item.QuantityReceived
+		if outstanding <= 0 {
+			summary.ReceivedLines++
+			continue
+		}
+		summary.UnreceivedValue += outstanding * item.UnitCost
+	}
+	return summary
 }
 
 func (s *Service) purchaseOrderNumber(businessID string, orderID *string) string {

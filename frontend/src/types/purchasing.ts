@@ -164,6 +164,11 @@ export type PurchaseOrder = {
   createdAt: string;
   updatedAt: string;
   items: PurchaseOrderItem[];
+  /** Sent on the list path too, where items is empty. */
+  stockLineCount: number;
+  receivedLineCount: number;
+  unreceivedValue: number;
+  hasActiveBill: boolean;
 };
 
 export type PurchaseInvoice = {

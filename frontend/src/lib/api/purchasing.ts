@@ -475,6 +475,10 @@ function parseOrder(value: unknown): PurchaseOrder {
     createdAt: stringValue(value.created_at),
     updatedAt: stringValue(value.updated_at),
     items: Array.isArray(value.items) ? value.items.map(parseOrderItem) : [],
+    stockLineCount: numberValue(value.stock_line_count),
+    receivedLineCount: numberValue(value.received_line_count),
+    unreceivedValue: numberValue(value.unreceived_value),
+    hasActiveBill: value.has_active_bill === true,
   };
 }
 
@@ -859,6 +863,11 @@ function parseDocumentChainOrder(value: unknown): PurchaseOrder {
     taxAmount: 0,
     totalAmount: numberValue(value.total_amount),
     updatedAt: "",
+    // A chain node is a link, not a list row; it carries no receiving state.
+    stockLineCount: 0,
+    receivedLineCount: 0,
+    unreceivedValue: 0,
+    hasActiveBill: false,
   };
 }
 
