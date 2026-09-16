@@ -1457,6 +1457,21 @@ func (r *Repository) Summary(businessID, branchID, timezone string) (*Purchasing
 	return &response, nil
 }
 
+// UserName resolves who entered a document. Purchasing documents carried only
+// created_by_user_id, so every bill, order and vendor credit on screen said it
+// was created by "User" -- the frontend's placeholder for a missing name.
+//
+// Regression: ISSUE-032 — purchasing documents credited every entry to "User"
+// Found by /qa on 2026-09-16
+func (r *Repository) UserName(businessID, userID string) string {
+	if strings.TrimSpace(userID) == "" {
+		return ""
+	}
+	var fullName string
+	_ = r.db.Table("users").Select("full_name").Where("id = ? AND business_id = ?", userID, businessID).Scan(&fullName).Error
+	return fullName
+}
+
 func (r *Repository) NameLookups(businessID, branchID, supplierID string) (string, string) {
 	var branchName, supplierName string
 	_ = r.db.Table("branches").Select("branch_name").Where("id = ? AND business_id = ?", branchID, businessID).Scan(&branchName).Error

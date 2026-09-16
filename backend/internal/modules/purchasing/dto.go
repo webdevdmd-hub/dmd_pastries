@@ -274,6 +274,8 @@ type PurchaseOrderResponse struct {
 	BusinessID           string                      `json:"business_id"`
 	BranchID             string                      `json:"branch_id"`
 	BranchName           string                      `json:"branch_name"`
+	CreatedByUserID      string                      `json:"created_by_user_id"`
+	CreatedByUserName    string                      `json:"created_by_user_name"`
 	SupplierID           string                      `json:"supplier_id"`
 	SupplierName         string                      `json:"supplier_name"`
 	PurchaseOrderNumber  string                      `json:"purchase_order_number"`
@@ -352,6 +354,8 @@ type PurchaseInvoiceResponse struct {
 	BusinessID          string     `json:"business_id"`
 	BranchID            string     `json:"branch_id"`
 	BranchName          string     `json:"branch_name"`
+	CreatedByUserID     string     `json:"created_by_user_id"`
+	CreatedByUserName   string     `json:"created_by_user_name"`
 	SupplierID          string     `json:"supplier_id"`
 	SupplierName        string     `json:"supplier_name"`
 	PurchaseOrderID     *string    `json:"purchase_order_id"`
@@ -562,6 +566,7 @@ type PurchaseReceiptResponse struct {
 	LinkedBillStatus         *string                       `json:"linked_bill_status"`
 	LinkedBillJournalEntryID *string                       `json:"linked_bill_journal_entry_id"`
 	ReceivedByUserID         string                        `json:"received_by_user_id"`
+	ReceivedByUserName       string                        `json:"received_by_user_name"`
 	Notes                    string                        `json:"notes"`
 	Items                    []PurchaseReceiptItemResponse `json:"items,omitempty"`
 	Charges                  []charges.ChargeResponse      `json:"charges,omitempty"`
@@ -623,6 +628,7 @@ type PurchaseReturnResponse struct {
 	ReversedByUserName         string                       `json:"reversed_by_user_name"`
 	ReversedAt                 *time.Time                   `json:"reversed_at"`
 	CreatedByUserID            string                       `json:"created_by_user_id"`
+	CreatedByUserName          string                       `json:"created_by_user_name"`
 	PostedByUserID             *string                      `json:"posted_by_user_id"`
 	PostedAt                   *time.Time                   `json:"posted_at"`
 	CancelledByUserID          *string                      `json:"cancelled_by_user_id"`
