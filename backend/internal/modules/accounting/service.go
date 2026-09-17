@@ -3029,10 +3029,7 @@ func (s *Service) PostSupplierPaymentJournal(tx *gorm.DB, currentUser *utils.Aut
 		lines = append(lines, JournalEntryLineRequest{AccountID: supplierAdvance.ID, DebitAmount: unappliedAmount, Description: "Unapplied supplier advance"})
 	}
 	lines = append(lines, JournalEntryLineRequest{AccountID: payment.ChartAccountID, CreditAmount: amount, Description: "Supplier payment via " + payment.PaymentMethodName})
-	reference := strings.TrimSpace(payment.ReferenceNumber)
-	if reference == "" {
-		reference = payment.ID
-	}
+	reference := supplierPaymentJournalReference(payment.ReferenceNumber, payment.SupplierName)
 	journalID, err := s.createPostedSystemJournal(tx, currentUser, payment.PaymentDate, payment.BranchID, "supplier_payment", payment.ID, reference, "Supplier payment "+payment.SupplierName, lines)
 	if err != nil {
 		return "", err
@@ -4203,12 +4200,20 @@ func (s *Service) GetAPReconciliation(currentUser *utils.AuthContext, query Reco
 	if err != nil {
 		return nil, apperrors.Internal("failed to total supplier opening balances")
 	}
-	operational = roundMoney(operational + supplierOpenings)
+	// A posted vendor credit debits 2000. Whatever is not applied to a bill
+	// stays there as money the supplier owes back, so it offsets the open
+	// bills. Without it VC-000001 (270.00, raised after its bill was paid)
+	// showed as 270.00 of drift on a correct ledger. (ISSUE-050)
+	openVendorCredits, err := s.repo.SumOpenVendorCredits(currentUser.BusinessID, query.BranchID)
+	if err != nil {
+		return nil, apperrors.Internal("failed to total open vendor credits")
+	}
+	operational = accountsPayableOperational(operational, supplierOpenings, openVendorCredits)
 	ledger, err := s.mappedLedgerBalance(currentUser.BusinessID, "accounts_payable", "2000", query.BranchID, query.AsOfDate)
 	if err != nil {
 		return nil, err
 	}
-	check := reconciliationCheck("accounts_payable", "Open supplier invoices vs Accounts Payable ledger", operational, ledger, "Compares posted purchase invoice balances with the mapped Accounts Payable ledger.")
+	check := reconciliationCheck("accounts_payable", "Open supplier invoices vs Accounts Payable ledger", operational, ledger, "Compares posted purchase invoice balances, less open vendor credits, with the mapped Accounts Payable ledger.")
 	_ = s.writeReportAudit(currentUser, "accounting.reconciliation_ap_viewed", "reconciliation_ap", query, ipAddress, userAgent)
 	return &check, nil
 }
@@ -4575,8 +4580,13 @@ func (s *Service) DeleteJournalEntry(currentUser *utils.AuthContext, id, ipAddre
 		if err := ensureAccountingRecordBranch(currentUser, entry.BranchID); err != nil {
 			return mapJournalEntryNotFound(err)
 		}
-		if strings.TrimSpace(entry.SourceType) != "" {
+		if !isManualJournalSource(entry.SourceType) {
 			return apperrors.BadRequest("system-generated journal entries must be deleted from the source document", nil)
+		}
+		// Owner decision 2026-09-17: drafts can be deleted; a posted journal is
+		// already in the ledger and in reports, so it is corrected by reversing.
+		if entry.Status != "draft" {
+			return apperrors.BadRequest("Posted journals can't be deleted. Reverse it instead.", nil)
 		}
 		if entry.ReversedEntryID != nil {
 			return apperrors.BadRequest("reversal journal entries cannot be hard deleted individually", nil)
@@ -4618,6 +4628,11 @@ func (s *Service) ReverseJournalEntry(currentUser *utils.AuthContext, id string,
 		}
 		if entry.Status != "posted" {
 			return apperrors.BadRequest("only posted journal entries can be reversed", nil)
+		}
+		// A system journal belongs to its sale, bill or payment. Reversing it here
+		// would leave that document claiming a journal the ledger has cancelled.
+		if !isManualJournalSource(entry.SourceType) {
+			return apperrors.BadRequest("system-generated journal entries are reversed from their source document", nil)
 		}
 		// Hard-block (Phase 5 default #3): a reversal flips the original row's
 		// status, mutating locked history. The reversal's own date must also be
@@ -4677,6 +4692,17 @@ func (s *Service) ReverseJournalEntry(currentUser *utils.AuthContext, id string,
 		return nil, err
 	}
 	return s.GetJournalEntry(currentUser, reversalID)
+}
+
+// isManualJournalSource reports whether a journal was entered by hand. Manual
+// journals are stored with source_type "manual"; older ones may carry none.
+//
+// Regression: ISSUE-048 — Delete compared source_type with "" only, so every
+// manual journal was refused as "system-generated", and the Delete button on
+// the journal page could never work.
+func isManualJournalSource(sourceType string) bool {
+	source := strings.TrimSpace(sourceType)
+	return source == "" || source == "manual"
 }
 
 func (s *Service) validateJournalBranch(tx *gorm.DB, currentUser *utils.AuthContext, branchID *string) error {

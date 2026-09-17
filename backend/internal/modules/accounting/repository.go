@@ -3457,6 +3457,20 @@ func (r *Repository) SumAccountsPayableOperational(businessID, branchID string) 
 	return roundMoney(total), err
 }
 
+// SumOpenVendorCredits totals posted vendor credits not yet applied to a bill:
+// the debit they left in Accounts Payable.
+func (r *Repository) SumOpenVendorCredits(businessID, branchID string) (float64, error) {
+	var total float64
+	db := r.db.Table("purchase_returns").
+		Select("COALESCE(SUM(open_credit_amount), 0)").
+		Where("business_id = ? AND deleted_at IS NULL AND status = 'posted' AND open_credit_amount > 0", businessID)
+	if strings.TrimSpace(branchID) != "" {
+		db = db.Where("branch_id = ?", strings.TrimSpace(branchID))
+	}
+	err := db.Scan(&total).Error
+	return roundMoney(total), err
+}
+
 func (r *Repository) SumAccountsReceivableOperational(businessID, branchID string) (float64, error) {
 	// The scope must be exactly the documents that debited AR. Filtering
 	// sale_status = 'completed' used to drop partially-refunded sales that
@@ -3473,9 +3487,12 @@ func (r *Repository) SumAccountsReceivableOperational(businessID, branchID strin
 		return 0, err
 	}
 	var bakeryTotal float64
+	// Only a completed order debits 1100; before that its deposits sit in
+	// 2200 and the rest is not yet owed. Counting open orders put ORD-000005's
+	// unpaid 301.00 into receivables the ledger never had. (ISSUE-049)
 	bakeryDB := r.db.Table("bakery_orders").
 		Select("COALESCE(SUM(balance_amount), 0)").
-		Where("business_id = ? AND deleted_at IS NULL AND "+reportshared.OutstandingBakeryOrderCondition(""), businessID)
+		Where("business_id = ? AND deleted_at IS NULL AND "+reportshared.OutstandingBakeryOrderCondition("")+" AND "+reportshared.BakeryOrderCompletedCondition(""), businessID)
 	if strings.TrimSpace(branchID) != "" {
 		bakeryDB = bakeryDB.Where("branch_id = ?", strings.TrimSpace(branchID))
 	}

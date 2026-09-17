@@ -71,6 +71,7 @@ import {
 import { useBranchOptions } from "@/hooks/use-lookups";
 import { usePermission } from "@/hooks/use-permission";
 import { getErrorMessage } from "@/lib/api/client";
+import { isLedgerAllowedForContext } from "@/lib/selectors/eligibility";
 import {
   accountTransferSchema,
   paymentAccountSchema,
@@ -1122,7 +1123,17 @@ function PlatformSettlementDialog({
       ),
     [paymentAccounts],
   );
-  const expenseOptions = useMemo(() => accountOptions(expenseAccounts), [expenseAccounts]);
+  // Header accounts (60, 62, 63) group others and take no postings; the
+  // deduction picker listed "60 - Operating Expenses" first. (ISSUE-052)
+  const expenseOptions = useMemo(
+    () =>
+      accountOptions(
+        expenseAccounts.filter((account) =>
+          isLedgerAllowedForContext(account, "expense_category_account"),
+        ),
+      ),
+    [expenseAccounts],
+  );
   const update = (patch: Partial<SettlementFormState>): void => {
     setForm((current) => ({ ...current, ...patch }));
   };

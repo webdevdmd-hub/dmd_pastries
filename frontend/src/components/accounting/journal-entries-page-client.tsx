@@ -760,7 +760,9 @@ function JournalEntryDetailsPanel({
               Reverse
             </Button>
           ) : null}
-          {canManage && entry.sourceType === "manual" ? (
+          {/* Drafts only (owner decision 2026-09-17): a posted journal is already
+              in the ledger and is corrected with Reverse. (ISSUE-048) */}
+          {canManage && entry.sourceType === "manual" && entry.status === "draft" ? (
             <Button
               className="border-danger/30 text-danger-text hover:bg-danger-tint"
               disabled={isLocked}
@@ -1407,7 +1409,7 @@ export function JournalEntriesPageClient(): JSX.Element {
               {pendingAction?.type === "post"
                 ? "Posted entries cannot be edited after posting."
                 : pendingAction?.type === "delete"
-                  ? "Manual journals are permanently deleted. System-generated journals must be deleted through their source document."
+                  ? `${pendingAction.entry.entryNumber} is a draft and has not touched the ledger. Deleting it cannot be undone.`
                   : "A reversal creates a new opposite posted journal entry."}
             </DialogDescription>
           </DialogHeader>
