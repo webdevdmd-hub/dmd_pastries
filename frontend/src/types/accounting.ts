@@ -746,6 +746,8 @@ export type OpeningBalanceSummary = {
   customerOpeningTotal: number;
   isBalanced: boolean;
   openingBalanceEquity: number;
+  /** Opening stock valued into 3400 by the inventory module. */
+  openingStockTotal: number;
   paymentAccountOpeningTotal: number;
   supplierOpeningTotal: number;
   unallocatedOpeningEquity: number;

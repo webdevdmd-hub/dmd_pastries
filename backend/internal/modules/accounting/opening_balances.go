@@ -461,8 +461,13 @@ func (s *Service) GetOpeningBalanceSummary(currentUser *utils.AuthContext, branc
 	if err != nil {
 		return nil, apperrors.Internal("failed to total payment account opening balances")
 	}
+	openingStock, err := s.repo.SumOpeningStockValue(currentUser.BusinessID, branchID)
+	if err != nil {
+		return nil, apperrors.Internal("failed to total opening stock")
+	}
 	unallocated := roundMoney(equity)
 	return &OpeningBalanceSummaryResponse{
+		OpeningStockTotal:          openingStock,
 		BranchID:                   branchID,
 		OpeningBalanceEquity:       roundMoney(equity),
 		ChartAccountOpeningTotal:   chartTotal,

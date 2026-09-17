@@ -448,6 +448,7 @@ type OpeningBalanceSummaryResponse struct {
 	SupplierOpeningTotal       float64 `json:"supplier_opening_total"`
 	PaymentAccountOpeningTotal float64 `json:"payment_account_opening_total"`
 	UnallocatedOpeningEquity   float64 `json:"unallocated_opening_equity"`
+	OpeningStockTotal          float64 `json:"opening_stock_total"`
 	IsBalanced                 bool    `json:"is_balanced"`
 }
 

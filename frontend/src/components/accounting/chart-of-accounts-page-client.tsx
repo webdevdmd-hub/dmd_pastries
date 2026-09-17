@@ -704,7 +704,7 @@ export function ChartOfAccountsPageClient(): JSX.Element {
             <DialogDescription>
               {pendingAction?.type === "delete"
                 ? "Only custom accounts without child accounts can be deleted. System accounts are protected."
-                : "System accounts cannot be deactivated. Backend accounting rules remain the final authority."}
+                : "System accounts cannot be deactivated."}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

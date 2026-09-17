@@ -124,7 +124,7 @@ const accountingSections = [
         status: "Statement",
       },
       {
-        description: "View assets, liabilities, equity, and backend-calculated balance rows.",
+        description: "View assets, liabilities, equity, and the current year's profit.",
         href: ROUTES.accountingBalanceSheet,
         icon: Landmark,
         label: "Balance Sheet",
@@ -145,7 +145,7 @@ const accountingSections = [
     description: "Setup, mappings, go-live balances, and the tools for repairing history.",
     items: [
       {
-        description: "Set financial-year start rules used by backend accounting reports.",
+        description: "Set when the financial year starts, and close the books.",
         href: ROUTES.accountingSettings,
         icon: Settings2,
         label: "Accounting Settings",

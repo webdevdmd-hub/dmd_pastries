@@ -47,6 +47,7 @@ import {
 } from "@/hooks/use-expenses";
 import { usePermission } from "@/hooks/use-permission";
 import { usePurchasingBranches, usePurchasingSuppliers } from "@/hooks/use-purchasing";
+import { accountOptionDescription } from "@/lib/accounting/labels";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
 import { initialExpenseBranchId, isRecordableBranchId } from "@/lib/purchasing/expense-form";
 import { supplierOptionsFor, supplierStatusNote } from "@/lib/purchasing/supplier-use";
@@ -148,7 +149,7 @@ function accountOptions(
         types.includes(account.accountType),
     )
     .map((account) => ({
-      description: `${account.accountType} · ${account.accountGroup || "No group"}`,
+      description: accountOptionDescription({ ...account, normalBalance: null }),
       keywords: [
         account.accountCode,
         account.accountName,

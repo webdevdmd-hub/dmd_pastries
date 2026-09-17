@@ -284,7 +284,7 @@ export function ProfitLossPageClient(): JSX.Element {
             <div className="flex flex-wrap items-center justify-end gap-4 border-b border-workspace-panel-border px-4 py-3 text-sm text-brand-mocha">
               <span className="inline-flex items-center gap-2">
                 <TrendingUp className="h-4 w-4" />
-                Backend calculated
+                Posted entries only
               </span>
               <Badge variant={profitLoss.netProfit >= 0 ? "secondary" : "outline"}>
                 {profitLoss.netProfit >= 0 ? "Profit" : "Loss"}
@@ -311,7 +311,7 @@ export function ProfitLossPageClient(): JSX.Element {
                     </tr>
                   </thead>
                   <tbody>
-                    <SectionRows section={profitLoss.income} title="Operating Income" />
+                    <SectionRows section={profitLoss.income} title="Income" />
                     <SectionRows section={profitLoss.cogs} title="Cost of Goods Sold" />
                     <tr className="border-b border-border bg-muted/60">
                       <td className="px-3 py-3 sm:px-6 font-semibold text-foreground">
@@ -319,25 +319,11 @@ export function ProfitLossPageClient(): JSX.Element {
                       </td>
                       <StatementAmount strong value={profitLoss.grossProfit} />
                     </tr>
-                    <SectionRows section={profitLoss.operatingExpenses} title="Operating Expense" />
-                    <tr className="border-b border-border">
-                      <td className="px-3 py-3 sm:px-6 font-semibold text-foreground">
-                        Operating Profit
-                      </td>
-                      <StatementAmount strong value={profitLoss.netProfit} />
-                    </tr>
-                    <tr className="border-b border-border">
-                      <td className="px-3 py-3 sm:px-6 font-semibold text-foreground">
-                        Non Operating Income
-                      </td>
-                      <StatementAmount strong value={0} />
-                    </tr>
-                    <tr className="border-b border-border">
-                      <td className="px-3 py-3 sm:px-6 font-semibold text-foreground">
-                        Non Operating Expense
-                      </td>
-                      <StatementAmount strong value={0} />
-                    </tr>
+                    {/* The report's sections hold every income and every expense
+                        account, other income and finance costs included. The
+                        page labelled them "Operating" and printed "Non Operating
+                        Income/Expense 0.00" whatever was posted. (ISSUE-055) */}
+                    <SectionRows section={profitLoss.operatingExpenses} title="Expenses" />
                     <tr className="border-t border-border text-base">
                       <td className="px-6 py-4 font-semibold text-foreground">Net Profit/Loss</td>
                       <td

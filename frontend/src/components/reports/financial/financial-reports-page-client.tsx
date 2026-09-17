@@ -119,8 +119,8 @@ export function FinancialReportsPageClient(): JSX.Element {
         <CardContent className="flex items-center gap-3 p-5 text-brand-mocha">
           <Landmark className="h-5 w-5 text-brand-mocha" aria-hidden="true" />
           <p className="text-sm">
-            Backend remains authoritative for totals, payments, refunds, supplier balances, and
-            reconciliation transactions.
+            Totals come from posted documents and journals: payments, refunds, supplier balances,
+            and reconciliation transactions.
           </p>
         </CardContent>
       </Card>

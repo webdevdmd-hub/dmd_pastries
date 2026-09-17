@@ -167,7 +167,9 @@ function BalanceSheetRows({
         <Fragment key={`${title}-${group.group}`}>
           <tr className="border-b border-border">
             <td className="pl-6 pr-3 py-3 sm:px-10 font-semibold text-foreground">{group.group}</td>
-            <AmountCell value={0} />
+            {/* A group heading has no amount of its own; 0.00 here read as a
+                zero balance. */}
+            <td />
           </tr>
           {group.items.map((item, itemIndex) => (
             <tr
@@ -192,12 +194,16 @@ function BalanceSheetRows({
               <AmountCell value={item.amount} />
             </tr>
           ))}
-          <tr className="border-b border-border">
-            <td className="pl-6 pr-3 py-3 sm:px-10 font-semibold text-foreground">
-              Total for {group.group}
-            </td>
-            <AmountCell strong value={group.amount} />
-          </tr>
+          {/* A section with one group named like the section printed "Total for
+              Equity" twice; the section total already says it. (ISSUE-053) */}
+          {groups.length > 1 || group.group !== title ? (
+            <tr className="border-b border-border">
+              <td className="pl-6 pr-3 py-3 sm:px-10 font-semibold text-foreground">
+                Total for {group.group}
+              </td>
+              <AmountCell strong value={group.amount} />
+            </tr>
+          ) : null}
         </Fragment>
       ))}
       <tr className="border-b border-border bg-muted/60">
@@ -406,9 +412,8 @@ export function BalanceSheetPageClient(): JSX.Element {
                 </table>
 
                 <p className="mt-6 text-xs text-foreground-muted">
-                  Amounts are shown in AED. Draft journal entries are excluded. Current year
-                  profit/loss rows are calculated by the backend from the configured financial year
-                  start.
+                  Amounts are shown in AED. Draft journal entries are excluded. Current year profit
+                  or loss is calculated from the financial year start in Accounting Settings.
                 </p>
               </div>
             </div>

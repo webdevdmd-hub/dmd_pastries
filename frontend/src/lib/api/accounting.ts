@@ -890,6 +890,14 @@ function parseReconciliationItems(value: unknown): AccountingReconciliationItem[
     return directItems.map(parseReconciliationItem);
   }
 
+  // /inventory, /ap and /ar answer with one check, not a list. Read as a map
+  // of objects it produced nothing, so those sections always said "0 checks,
+  // All matched" -- including while Accounts Payable was unmatched.
+  // (ISSUE-054)
+  if (typeof value.check_key === "string") {
+    return [parseReconciliationItem(value)];
+  }
+
   return Object.entries(value)
     .filter(([, item]) => isObject(item))
     .map(([key, item]) =>
@@ -2211,6 +2219,7 @@ function parseOpeningBalanceSummary(value: unknown): OpeningBalanceSummary {
     customerOpeningTotal: numberValue(row.customer_opening_total, 0),
     isBalanced: row.is_balanced === true,
     openingBalanceEquity: numberValue(row.opening_balance_equity, 0),
+    openingStockTotal: numberValue(row.opening_stock_total, 0),
     paymentAccountOpeningTotal: numberValue(row.payment_account_opening_total, 0),
     supplierOpeningTotal: numberValue(row.supplier_opening_total, 0),
     unallocatedOpeningEquity: numberValue(row.unallocated_opening_equity, 0),

@@ -29,6 +29,7 @@ import { useBranchScope } from "@/hooks/use-branch-scope";
 import { useCustomers } from "@/hooks/use-customers";
 import { usePermission } from "@/hooks/use-permission";
 import { useSuppliers } from "@/hooks/use-suppliers";
+import { accountOptionDescription } from "@/lib/accounting/labels";
 import { getErrorMessage } from "@/lib/api/client";
 import type { CounterpartyOpening } from "@/types/accounting";
 
@@ -126,7 +127,7 @@ export function OpeningBalancesPageClient(): JSX.Element {
       (accountsQuery.data ?? []).map((account) => ({
         value: account.id,
         label: `${account.accountCode} - ${account.accountName}`,
-        description: `${account.accountType} / ${account.normalBalance}`,
+        description: accountOptionDescription({ ...account, accountGroup: null }),
         keywords: [account.accountCode, account.accountName, account.accountType],
       })),
     [accountsQuery.data],
@@ -224,7 +225,13 @@ export function OpeningBalancesPageClient(): JSX.Element {
                   ? "Every opening balance has been accounted for; 3400 is clear."
                   : "This is the part of the opening trial balance not yet entered. It should reach zero once every account, customer and supplier opening is in."}
               </p>
-              <div className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-5">
+                {/* Opening stock also credits 3400. Without it the card read
+                    1,350.00 unallocated with every category 0.00. (ISSUE-053) */}
+                <div>
+                  <FieldLabel>Opening stock</FieldLabel>
+                  <p className="tabular-nums">{formatMoney(summary.openingStockTotal)}</p>
+                </div>
                 <div>
                   <FieldLabel>Accounts</FieldLabel>
                   <p>{formatMoney(summary.chartAccountOpeningTotal)}</p>
