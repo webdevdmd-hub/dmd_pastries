@@ -18,7 +18,7 @@ export function labelFromKey(value: string): string {
 
 export function formatAuditValue(value: ActivityMetadataValue): string {
   if (value === null || value === "") {
-    return "Empty";
+    return "None";
   }
 
   if (typeof value === "boolean") {
@@ -26,7 +26,7 @@ export function formatAuditValue(value: ActivityMetadataValue): string {
   }
 
   if (Array.isArray(value)) {
-    return value.length > 0 ? value.map((entry) => String(entry)).join(", ") : "Empty";
+    return value.length > 0 ? value.map((entry) => String(entry)).join(", ") : "None";
   }
 
   if (typeof value === "object") {

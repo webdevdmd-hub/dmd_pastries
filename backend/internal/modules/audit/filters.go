@@ -22,6 +22,7 @@ type ActivityLogFilter struct {
 	StartUTC     *time.Time
 	EndUTC       *time.Time
 	Timezone     string
+	IncludeViews bool
 }
 
 func NormalizeActivityLogLimit(limitValue string) (int, error) {
@@ -71,6 +72,7 @@ func (r *Repository) ResolveActivityLogFilter(businessID string, query ActivityL
 		StartUTC:     startUTC,
 		EndUTC:       endUTC,
 		Timezone:     locationName,
+		IncludeViews: query.IncludeViews,
 	}, nil
 }
 

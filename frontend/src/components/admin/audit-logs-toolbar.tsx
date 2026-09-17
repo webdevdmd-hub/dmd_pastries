@@ -6,6 +6,7 @@ import { useMemo } from "react";
 import { FilterField, FilterToolbar } from "@/components/shared/filter-toolbar";
 import type { SearchableComboboxOption } from "@/components/shared/searchable-combobox";
 import { SearchableCombobox } from "@/components/shared/searchable-combobox";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -20,6 +21,8 @@ export type AuditLogFilters = {
   dateFrom: string;
   dateTo: string;
   entityType: string;
+  /** Views ("Jo viewed report summary") are hidden unless switched on. */
+  includeViews: boolean;
   userId: string;
 };
 
@@ -27,6 +30,7 @@ export const defaultAuditLogFilters: AuditLogFilters = {
   dateFrom: "",
   dateTo: "",
   entityType: "all",
+  includeViews: false,
   userId: "",
 };
 
@@ -36,6 +40,7 @@ function countHiddenFilters(filters: AuditLogFilters): number {
   if (filters.userId.length > 0) count += 1;
   if (filters.dateFrom.length > 0) count += 1;
   if (filters.dateTo.length > 0) count += 1;
+  if (filters.includeViews) count += 1;
   return count;
 }
 
@@ -130,6 +135,20 @@ export function AuditLogsToolbar({
           />
         </FilterField>
       </div>
+
+      <label
+        className="flex items-center gap-2 border-t border-border pt-3 text-cell"
+        htmlFor="auditFilterIncludeViews"
+      >
+        <Checkbox
+          checked={filters.includeViews}
+          id="auditFilterIncludeViews"
+          onCheckedChange={(checked) =>
+            onFiltersChange({ ...filters, includeViews: checked === true })
+          }
+        />
+        Include views (who opened reports and dashboards)
+      </label>
 
       {/* Dates are read in the business timezone, and a log read in the wrong
           one is a log that disagrees with everyone's memory of the day. */}

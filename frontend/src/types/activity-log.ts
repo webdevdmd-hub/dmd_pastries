@@ -51,4 +51,5 @@ export type ActivityLogFilters = {
   dateFrom?: string;
   dateTo?: string;
   timezone?: string;
+  includeViews?: boolean;
 };
