@@ -35,7 +35,7 @@ func (h *Handler) CreateRole(c *gin.Context) {
 	}
 
 	currentUser := utils.MustAuthContext(c)
-	role, err := h.service.CreateRole(currentUser, req)
+	role, err := h.service.CreateRole(currentUser, req, c.ClientIP(), c.Request.UserAgent())
 	if err != nil {
 		handleError(c, err)
 		return
@@ -52,7 +52,7 @@ func (h *Handler) UpdateRole(c *gin.Context) {
 	}
 
 	currentUser := utils.MustAuthContext(c)
-	role, err := h.service.UpdateRole(currentUser, c.Param("id"), req)
+	role, err := h.service.UpdateRole(currentUser, c.Param("id"), req, c.ClientIP(), c.Request.UserAgent())
 	if err != nil {
 		handleError(c, err)
 		return
@@ -63,7 +63,7 @@ func (h *Handler) UpdateRole(c *gin.Context) {
 
 func (h *Handler) DeleteRole(c *gin.Context) {
 	currentUser := utils.MustAuthContext(c)
-	if err := h.service.DeleteRole(currentUser, c.Param("id")); err != nil {
+	if err := h.service.DeleteRole(currentUser, c.Param("id"), c.ClientIP(), c.Request.UserAgent()); err != nil {
 		handleError(c, err)
 		return
 	}
@@ -90,7 +90,7 @@ func (h *Handler) UpdateRolePermissions(c *gin.Context) {
 	}
 
 	currentUser := utils.MustAuthContext(c)
-	rolePermissions, err := h.service.UpdateRolePermissions(currentUser, c.Param("id"), req)
+	rolePermissions, err := h.service.UpdateRolePermissions(currentUser, c.Param("id"), req, c.ClientIP(), c.Request.UserAgent())
 	if err != nil {
 		handleError(c, err)
 		return

@@ -5,6 +5,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"pastries-pos/internal/modules/audit"
 	"pastries-pos/internal/modules/permissions"
 	apperrors "pastries-pos/internal/shared/errors"
 	"pastries-pos/internal/shared/utils"
@@ -16,6 +17,7 @@ type Service struct {
 	db             *gorm.DB
 	repo           *Repository
 	permissionRepo *permissions.Repository
+	auditRepo      *audit.Repository
 }
 
 func NewService(db *gorm.DB, repo *Repository, permissionRepo *permissions.Repository) *Service {
@@ -54,7 +56,7 @@ func (s *Service) ListRoles(currentUser *utils.AuthContext) ([]RoleResponse, err
 	return response, nil
 }
 
-func (s *Service) CreateRole(currentUser *utils.AuthContext, req CreateRoleRequest) (*RoleResponse, error) {
+func (s *Service) CreateRole(currentUser *utils.AuthContext, req CreateRoleRequest, ipAddress, userAgent string) (*RoleResponse, error) {
 	roleName := strings.TrimSpace(req.RoleName)
 	if roleName == "" {
 		return nil, apperrors.BadRequest("role_name is required", nil)
@@ -143,6 +145,13 @@ func (s *Service) CreateRole(currentUser *utils.AuthContext, req CreateRoleReque
 		tx.Rollback()
 		return nil, apperrors.Internal("failed to attach permissions to role")
 	}
+	if err := s.writeRoleAudit(tx, currentUser, "role.created", role.ID, "Role created.", map[string]interface{}{
+		"role_name":       role.RoleName,
+		"permission_keys": normalizedKeys,
+	}, ipAddress, userAgent); err != nil {
+		tx.Rollback()
+		return nil, err
+	}
 
 	if err := tx.Commit().Error; err != nil {
 		return nil, apperrors.Internal("failed to commit role creation")
@@ -160,7 +169,7 @@ func (s *Service) CreateRole(currentUser *utils.AuthContext, req CreateRoleReque
 	}, nil
 }
 
-func (s *Service) UpdateRole(currentUser *utils.AuthContext, roleID string, req UpdateRoleRequest) (*RoleResponse, error) {
+func (s *Service) UpdateRole(currentUser *utils.AuthContext, roleID string, req UpdateRoleRequest, ipAddress, userAgent string) (*RoleResponse, error) {
 	role, err := s.repo.FindByIDAndBusinessID(roleID, currentUser.BusinessID)
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -263,6 +272,14 @@ func (s *Service) UpdateRole(currentUser *utils.AuthContext, roleID string, req 
 		}
 	}
 
+	var previousKeys []string
+	if replacePermissions {
+		previousKeys, err = s.repo.GetPermissionKeysByRoleID(roleID)
+		if err != nil {
+			return nil, apperrors.Internal("failed to load role permissions")
+		}
+	}
+
 	tx := s.db.Begin()
 	if tx.Error != nil {
 		return nil, apperrors.Internal("failed to start transaction")
@@ -292,6 +309,20 @@ func (s *Service) UpdateRole(currentUser *utils.AuthContext, roleID string, req 
 		}
 	}
 
+	metadata := map[string]interface{}{"role_name": role.RoleName}
+	for key, value := range updates {
+		metadata["new_"+key] = value
+	}
+	if replacePermissions {
+		added, removed := permissionChanges(previousKeys, normalizedKeys)
+		metadata["permissions_added"] = added
+		metadata["permissions_removed"] = removed
+	}
+	if err := s.writeRoleAudit(tx, currentUser, "role.updated", roleID, "Role updated.", metadata, ipAddress, userAgent); err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
 	if err := tx.Commit().Error; err != nil {
 		return nil, apperrors.Internal("failed to commit role update")
 	}
@@ -318,7 +349,7 @@ func (s *Service) UpdateRole(currentUser *utils.AuthContext, roleID string, req 
 	}, nil
 }
 
-func (s *Service) DeleteRole(currentUser *utils.AuthContext, roleID string) error {
+func (s *Service) DeleteRole(currentUser *utils.AuthContext, roleID string, ipAddress, userAgent string) error {
 	role, err := s.repo.FindByIDAndBusinessID(roleID, currentUser.BusinessID)
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -358,6 +389,12 @@ func (s *Service) DeleteRole(currentUser *utils.AuthContext, roleID string) erro
 		tx.Rollback()
 		return apperrors.Internal("failed to delete role")
 	}
+	if err := s.writeRoleAudit(tx, currentUser, "role.deleted", roleID, "Role deleted.", map[string]interface{}{
+		"role_name": role.RoleName,
+	}, ipAddress, userAgent); err != nil {
+		tx.Rollback()
+		return err
+	}
 
 	if err := tx.Commit().Error; err != nil {
 		return apperrors.Internal("failed to commit role deletion")
@@ -388,7 +425,7 @@ func (s *Service) GetRolePermissions(currentUser *utils.AuthContext, roleID stri
 	}, nil
 }
 
-func (s *Service) UpdateRolePermissions(currentUser *utils.AuthContext, roleID string, req UpdateRolePermissionsRequest) (*RolePermissionsResponse, error) {
+func (s *Service) UpdateRolePermissions(currentUser *utils.AuthContext, roleID string, req UpdateRolePermissionsRequest, ipAddress, userAgent string) (*RolePermissionsResponse, error) {
 	normalizedKeys := make([]string, 0, len(req.PermissionKeys))
 	seen := make(map[string]struct{}, len(req.PermissionKeys))
 	for _, key := range req.PermissionKeys {
@@ -461,6 +498,11 @@ func (s *Service) UpdateRolePermissions(currentUser *utils.AuthContext, roleID s
 		})
 	}
 
+	previousKeys, err := s.repo.GetPermissionKeysByRoleID(roleID)
+	if err != nil {
+		return nil, apperrors.Internal("failed to load role permissions")
+	}
+
 	tx := s.db.Begin()
 	if tx.Error != nil {
 		return nil, apperrors.Internal("failed to start transaction")
@@ -469,6 +511,15 @@ func (s *Service) UpdateRolePermissions(currentUser *utils.AuthContext, roleID s
 	if err := s.repo.ReplacePermissions(tx, roleID, rolePermissions); err != nil {
 		tx.Rollback()
 		return nil, apperrors.Internal("failed to update role permissions")
+	}
+	added, removed := permissionChanges(previousKeys, normalizedKeys)
+	if err := s.writeRoleAudit(tx, currentUser, "role.permissions_updated", roleID, "Role permissions updated.", map[string]interface{}{
+		"role_name":           role.RoleName,
+		"permissions_added":   added,
+		"permissions_removed": removed,
+	}, ipAddress, userAgent); err != nil {
+		tx.Rollback()
+		return nil, err
 	}
 
 	if err := tx.Commit().Error; err != nil {

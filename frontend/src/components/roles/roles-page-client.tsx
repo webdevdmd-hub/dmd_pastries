@@ -29,6 +29,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -38,6 +39,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
   useCreateRole,
+  useDeleteRole,
   useRolePermissions,
   useRoles,
   useUpdateRole,
@@ -45,6 +47,7 @@ import {
 } from "@/hooks/use-roles";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
 import { getUsers } from "@/lib/api/users";
+import { rolePermissionChangeBlockedReason } from "@/lib/roles/grantable";
 import type { Permission, RolePermission } from "@/types/permission";
 import type { CreateRolePayload, Role, RoleFormMode, UpdateRolePayload } from "@/types/role";
 import type { User } from "@/types/user";
@@ -100,6 +103,8 @@ export function RolesPageClient(): JSX.Element {
   } | null>(null);
   const { data: rolesData, error, isLoading, refetch } = useRoles();
   const createRoleMutation = useCreateRole();
+  const deleteRoleMutation = useDeleteRole();
+  const [deleteTarget, setDeleteTarget] = useState<Role | null>(null);
   const updateRoleMutation = useUpdateRole();
   const updateRolePermissionsMutation = useUpdateRolePermissions();
   const permissionsQuery = usePermissions();
@@ -119,6 +124,7 @@ export function RolesPageClient(): JSX.Element {
   const canViewRoles = hasAnyPermission([PERMISSIONS.rolesView, PERMISSIONS.rolesPermissionsView]);
   const canCreateRoles = hasAnyPermission([PERMISSIONS.rolesCreate]);
   const canEditRoles = hasAnyPermission([PERMISSIONS.rolesEdit]);
+  const canDeleteRoles = hasAnyPermission([PERMISSIONS.rolesDelete]);
   const canViewRolePermissions = hasAnyPermission([
     PERMISSIONS.rolesPermissionsView,
     PERMISSIONS.rolesView,
@@ -177,7 +183,7 @@ export function RolesPageClient(): JSX.Element {
       return null;
     }
 
-    return "The backend denied GET /api/v1/permissions. Permission selection and matrix editing require roles view or permission-management access.";
+    return "You don't have access to the permission list, so permissions can't be viewed or changed here.";
   }, [permissionsQuery.error]);
   const permissionMatrixErrorMessage = useMemo(() => {
     if (permissionEndpointWarning) {
@@ -254,8 +260,26 @@ export function RolesPageClient(): JSX.Element {
     openPermissionsDialog(role, "manage");
   };
 
+  const handleDeleteRole = async (): Promise<void> => {
+    if (!deleteTarget) {
+      return;
+    }
+    try {
+      await deleteRoleMutation.mutateAsync(deleteTarget.id);
+      toast.success(`${deleteTarget.roleName} deleted.`);
+      setDeleteTarget(null);
+    } catch (mutationError) {
+      toast.error(getErrorMessage(mutationError));
+    }
+  };
+
   const listHandlers = {
+    canDelete: canDeleteRoles,
     canEdit: canEditRoles,
+    onDelete: (role: Role) => {
+      setDrawerRole(null);
+      setDeleteTarget(role);
+    },
     canManagePermissions: canUpdateRolePermissions,
     canViewUserAssignments,
     onEdit: editFromDrawer,
@@ -321,9 +345,7 @@ export function RolesPageClient(): JSX.Element {
   const isPermissionDenied = error instanceof ApiError && error.status === 403;
 
   if (isPermissionDenied) {
-    return (
-      <AccessDeniedCard description="The backend denied access to the roles endpoint. Your current role does not allow this request." />
-    );
+    return <AccessDeniedCard description="Your role doesn't allow viewing roles." />;
   }
 
   return (
@@ -436,7 +458,37 @@ export function RolesPageClient(): JSX.Element {
         permissions={permissionsQuery.data ?? []}
         permissionsUnavailableReason={permissionsDialogUnavailableReason}
         role={dialogRole}
+        heldPermissionKeys={user?.permissions ?? []}
       />
+
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(nextOpen) => (!nextOpen ? setDeleteTarget(null) : undefined)}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete {deleteTarget?.roleName}?</DialogTitle>
+            <DialogDescription>
+              {deleteTarget && deleteTarget.usersCount > 0
+                ? `${String(deleteTarget.usersCount)} staff ${deleteTarget.usersCount === 1 ? "user has" : "users have"} this role. Move them to another role first.`
+                : "The role and its permissions are removed. This cannot be undone."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setDeleteTarget(null)} type="button" variant="outline">
+              Cancel
+            </Button>
+            <Button
+              disabled={deleteRoleMutation.isPending || (deleteTarget?.usersCount ?? 0) > 0}
+              onClick={() => void handleDeleteRole()}
+              type="button"
+              variant="danger"
+            >
+              {deleteRoleMutation.isPending ? "Deleting..." : "Delete role"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={permissionDialog !== null}
@@ -471,7 +523,13 @@ export function RolesPageClient(): JSX.Element {
               permissions={permissionsQuery.data ?? []}
               role={selectedRole}
               rolePermissions={rolePermissionsQuery.data}
-              saveDisabledReason={permissionEndpointWarning}
+              heldPermissionKeys={user?.permissions ?? []}
+              saveDisabledReason={
+                permissionEndpointWarning ??
+                (selectedRole && user && selectedRole.roleName.toLowerCase() !== "admin"
+                  ? rolePermissionChangeBlockedReason(selectedRole, user)
+                  : null)
+              }
               showSave={permissionDialog?.mode === "manage"}
             />
           </div>
@@ -482,8 +540,7 @@ export function RolesPageClient(): JSX.Element {
         <Card>
           <CardContent className="flex items-start gap-3 p-5 text-sm leading-6 text-brand-mocha">
             <ShieldOff className="mt-0.5 h-5 w-5 shrink-0 text-brand-caramel" />
-            Assigned user counts are shown only when the current account also has `users.view`,
-            because the backend does not include `users_count` in the role list response.
+            Assigned user counts are shown only to people who can also view staff users.
           </CardContent>
         </Card>
       ) : null}

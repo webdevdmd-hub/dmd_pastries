@@ -197,6 +197,7 @@ func main() {
 	auditHandler := audit.NewHandler(auditService)
 
 	roleService := roles.NewService(db, roleRepo, permissionRepo)
+	roleService.SetAuditRepository(auditRepo)
 	roleHandler := roles.NewHandler(roleService)
 
 	permissionService := permissions.NewService(permissionRepo)

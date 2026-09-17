@@ -27,13 +27,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
 import {
   type CreateRoleSchema,
@@ -42,13 +35,7 @@ import {
   updateRoleSchema,
 } from "@/lib/validators/role.schema";
 import type { PermissionDefinition } from "@/types/permission";
-import type {
-  CreateRolePayload,
-  Role,
-  RoleFormMode,
-  RoleStatus,
-  UpdateRolePayload,
-} from "@/types/role";
+import type { CreateRolePayload, Role, RoleFormMode, UpdateRolePayload } from "@/types/role";
 
 import { PermissionModuleCard } from "./permission-module-card";
 
@@ -62,9 +49,10 @@ type RoleFormDialogProps = {
   permissions: PermissionDefinition[];
   permissionsUnavailableReason?: string | null;
   role: Role | null;
+  /** The editor's own permissions; a new role may only include these. */
+  heldPermissionKeys?: readonly string[] | undefined;
 };
 
-const roleStatusOptions: RoleStatus[] = ["active", "inactive"];
 const permissionRequiredMessage = "Please select at least one permission.";
 const validationToastMessage = "Please check the highlighted fields.";
 
@@ -110,6 +98,7 @@ export function RoleFormDialog({
   permissions,
   permissionsUnavailableReason = null,
   role,
+  heldPermissionKeys,
 }: RoleFormDialogProps): JSX.Element {
   const [createSubmitMessage, setCreateSubmitMessage] = useState<string | null>(null);
   const createForm = useForm<CreateRoleSchema>({
@@ -289,7 +278,7 @@ export function RoleFormDialog({
                     <FormItem>
                       <FormLabel>Initial permissions</FormLabel>
                       <FormDescription>
-                        The current backend requires at least one permission when creating a role.
+                        Choose at least one permission. You can change them later.
                       </FormDescription>
                       <div className="grid gap-4 lg:grid-cols-2">
                         {Object.entries(groupedPermissions).map(
@@ -298,6 +287,7 @@ export function RoleFormDialog({
                               key={moduleName}
                               changedPermissionIds={new Set()}
                               disabled={createDisabled}
+                              heldPermissionKeys={heldPermissionKeys}
                               moduleName={moduleName}
                               onToggle={(permissionId, checked) => {
                                 setCreateSubmitMessage(null);
@@ -375,8 +365,8 @@ export function RoleFormDialog({
                     <div className="flex items-start gap-3">
                       <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
                       <div>
-                        Predefined role names are protected by the backend. You can update the
-                        description here and manage permissions from the permission matrix.
+                        This role ships with the app, so its name is fixed. You can update the
+                        description here and change permissions from Manage permissions.
                       </div>
                     </div>
                   </div>
@@ -397,34 +387,6 @@ export function RoleFormDialog({
                             Predefined role names cannot be changed.
                           </FormDescription>
                         ) : null}
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={updateForm.control}
-                    name="status"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Status</FormLabel>
-                        <Select disabled value={field.value} onValueChange={field.onChange}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a status" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {roleStatusOptions.map((status) => (
-                              <SelectItem key={status} value={status}>
-                                {status}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormDescription>
-                          Role status is not currently exposed as a persisted backend field, so it
-                          is shown as read-only.
-                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}

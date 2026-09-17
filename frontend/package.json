@@ -65,6 +65,7 @@
     "test:accounting-labels": "node scripts/check-accounting-labels.mjs",
     "test:manual-journal-actions": "node scripts/check-manual-journal-actions.mjs",
     "test:role-grants": "node scripts/check-role-grants.mjs",
+    "test:roles-page": "node scripts/check-roles-page.mjs",
     "test:supplier-payment-subject": "node scripts/check-supplier-payment-subject.mjs",
     "test:zero-total-checkout": "node scripts/check-zero-total-checkout.mjs"
   },
