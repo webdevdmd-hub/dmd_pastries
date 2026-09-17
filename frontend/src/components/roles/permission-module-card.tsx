@@ -17,6 +17,8 @@ type PermissionModuleCardProps = {
   onToggle: (permissionId: string, checked: boolean) => void;
   permissions: PermissionDefinition[];
   selectedPermissionIds: Set<string>;
+  /** The editor's own permissions; others cannot be granted (ISSUE-056). */
+  heldPermissionKeys?: readonly string[] | undefined;
 };
 
 function formatLabel(value: string): string {
@@ -37,8 +39,19 @@ function getModuleMeta(moduleName: PermissionModuleName): {
 
   return {
     title: formatLabel(moduleName),
-    description: `Control ${formatLabel(moduleName).toLowerCase()} actions exposed by the backend permissions API.`,
+    description: `Control what this role can do in ${formatLabel(moduleName).toLowerCase()}.`,
   };
+}
+
+// Seeded descriptions were often the key re-cased ("Audit_logs View",
+// "Pos Cancel_held_sale"). Those read as labels, not sentences, so they are
+// rebuilt from the key; written descriptions pass through. (ISSUE-059)
+function readablePermissionDescription(permission: PermissionDefinition): string {
+  const description = permission.description.trim();
+  if (description === "" || description.includes("_")) {
+    return `${formatLabel(permission.permissionKey.split(".")[0] ?? "")}: ${getPermissionActionLabel(permission.permissionKey).toLowerCase()}`;
+  }
+  return description;
 }
 
 function getPermissionActionLabel(permissionKey: string): string {
@@ -55,6 +68,7 @@ export function PermissionModuleCard({
   onToggle,
   permissions,
   selectedPermissionIds,
+  heldPermissionKeys,
 }: PermissionModuleCardProps): JSX.Element {
   const meta = getModuleMeta(moduleName);
 
@@ -70,6 +84,9 @@ export function PermissionModuleCard({
           const checked = selectedPermissionIds.has(permission.id);
           const changed = changedPermissionIds.has(permission.id);
           const inputId = `${moduleName}-${permission.id}`;
+          const beyondAccess =
+            heldPermissionKeys !== undefined &&
+            !heldPermissionKeys.includes(permission.permissionKey);
 
           return (
             <label
@@ -86,7 +103,7 @@ export function PermissionModuleCard({
             >
               <Checkbox
                 checked={checked}
-                disabled={disabled}
+                disabled={disabled || (beyondAccess && !checked)}
                 id={inputId}
                 onCheckedChange={(nextValue: CheckedState) => {
                   onToggle(permission.id, nextValue === true);
@@ -97,7 +114,10 @@ export function PermissionModuleCard({
                   {getPermissionActionLabel(permission.permissionKey)}
                 </p>
                 <p className="text-xs font-medium text-brand-mocha">{permission.permissionKey}</p>
-                <p className="text-sm leading-6 text-brand-mocha">{permission.description}</p>
+                <p className="text-sm leading-6 text-brand-mocha">
+                  {readablePermissionDescription(permission)}
+                  {beyondAccess ? " (beyond your access)" : ""}
+                </p>
               </div>
             </label>
           );

@@ -14,7 +14,7 @@ func TestCreateRoleRequiresAtLeastOnePermission(t *testing.T) {
 	_, err := service.CreateRole(currentUser, CreateRoleRequest{
 		RoleName:       "Cashier",
 		PermissionKeys: []string{},
-	})
+	}, "", "")
 
 	assertPermissionRequiredError(t, err)
 }
@@ -26,7 +26,7 @@ func TestCreateRoleRequiresAtLeastOneNonBlankPermission(t *testing.T) {
 	_, err := service.CreateRole(currentUser, CreateRoleRequest{
 		RoleName:       "Cashier",
 		PermissionKeys: []string{" ", ""},
-	})
+	}, "", "")
 
 	assertPermissionRequiredError(t, err)
 }
@@ -39,6 +39,7 @@ func TestUpdateRolePermissionsRequiresAtLeastOnePermission(t *testing.T) {
 		currentUser,
 		"role-id",
 		UpdateRolePermissionsRequest{PermissionKeys: []string{}},
+		"", "",
 	)
 
 	assertPermissionRequiredError(t, err)
@@ -52,6 +53,7 @@ func TestUpdateRolePermissionsRequiresAtLeastOneNonBlankPermission(t *testing.T)
 		currentUser,
 		"role-id",
 		UpdateRolePermissionsRequest{PermissionKeys: []string{" ", ""}},
+		"", "",
 	)
 
 	assertPermissionRequiredError(t, err)

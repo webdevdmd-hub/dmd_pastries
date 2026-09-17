@@ -31,6 +31,8 @@ type PermissionMatrixProps = {
   rolePermissions: RolePermission[] | undefined;
   saveDisabledReason?: string | null;
   showSave?: boolean;
+  /** The editor's own permissions; others cannot be added (ISSUE-056). */
+  heldPermissionKeys?: readonly string[];
 };
 
 type ModuleGroup = {
@@ -87,7 +89,13 @@ export function PermissionMatrix({
   rolePermissions,
   saveDisabledReason = null,
   showSave = true,
+  heldPermissionKeys,
 }: PermissionMatrixProps): JSX.Element {
+  const heldKeys = useMemo(
+    () => (heldPermissionKeys ? new Set(heldPermissionKeys) : null),
+    [heldPermissionKeys],
+  );
+  const canGrant = (permissionKey: string): boolean => heldKeys?.has(permissionKey) ?? true;
   const [selectedPermissionIds, setSelectedPermissionIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
@@ -282,7 +290,9 @@ export function PermissionMatrix({
             <Button
               onClick={() =>
                 toggleMany(
-                  permissions.map((permission) => permission.id),
+                  permissions
+                    .filter((permission) => canGrant(permission.permissionKey))
+                    .map((permission) => permission.id),
                   true,
                 )
               }
@@ -356,7 +366,16 @@ export function PermissionMatrix({
                   aria-label={`Grant every ${group.title} permission`}
                   checked={allGranted ? true : grantedInModule > 0 ? "indeterminate" : false}
                   disabled={matrixDisabled}
-                  onCheckedChange={(checked) => toggleMany(ids, checked === true)}
+                  onCheckedChange={(checked) =>
+                    toggleMany(
+                      checked === true
+                        ? group.permissions
+                            .filter((permission) => canGrant(permission.permissionKey))
+                            .map((permission) => permission.id)
+                        : ids,
+                      checked === true,
+                    )
+                  }
                 />
                 <button
                   aria-expanded={isOpen}
@@ -405,7 +424,9 @@ export function PermissionMatrix({
                         <Checkbox
                           checked={checked}
                           className="mt-0.5"
-                          disabled={matrixDisabled}
+                          disabled={
+                            matrixDisabled || (!checked && !canGrant(permission.permissionKey))
+                          }
                           onCheckedChange={(next) => toggleOne(permission.id, next === true)}
                         />
                         <span className="min-w-0">
