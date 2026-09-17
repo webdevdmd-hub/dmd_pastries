@@ -77,6 +77,9 @@ func (s *Service) CreateRole(currentUser *utils.AuthContext, req CreateRoleReque
 	if len(normalizedKeys) == 0 {
 		return nil, permissionRequiredError()
 	}
+	if err := grantingBeyondAccess(currentUser, normalizedKeys); err != nil {
+		return nil, err
+	}
 
 	exists, err := s.repo.ExistsByNameAndBusinessID(roleName, currentUser.BusinessID)
 	if err != nil {
@@ -169,6 +172,9 @@ func (s *Service) UpdateRole(currentUser *utils.AuthContext, roleID string, req 
 	if role.BusinessID == nil {
 		return nil, apperrors.Forbidden("global system roles cannot be updated")
 	}
+	if err := s.ensureCanChangeRole(currentUser, role, req.PermissionKeys != nil); err != nil {
+		return nil, err
+	}
 
 	updates := map[string]interface{}{}
 	var normalizedKeys []string
@@ -222,6 +228,9 @@ func (s *Service) UpdateRole(currentUser *utils.AuthContext, roleID string, req 
 		}
 		if isAdminRole(role) && !hasAllPermissionKeys(normalizedKeys) {
 			return nil, apperrors.Forbidden("admin role must keep full permission access")
+		}
+		if err := grantingBeyondAccess(currentUser, normalizedKeys); err != nil {
+			return nil, err
 		}
 	}
 
@@ -321,6 +330,9 @@ func (s *Service) DeleteRole(currentUser *utils.AuthContext, roleID string) erro
 	if role.BusinessID == nil || role.IsSystemDefault {
 		return apperrors.Forbidden("system roles cannot be deleted")
 	}
+	if err := s.ensureCanChangeRole(currentUser, role, false); err != nil {
+		return err
+	}
 
 	assignedUsersCount, err := s.repo.CountAssignedUsers(roleID, currentUser.BusinessID)
 	if err != nil {
@@ -405,6 +417,12 @@ func (s *Service) UpdateRolePermissions(currentUser *utils.AuthContext, roleID s
 
 	if role.BusinessID == nil {
 		return nil, apperrors.Forbidden("global system roles cannot be updated")
+	}
+	if err := s.ensureCanChangeRole(currentUser, role, true); err != nil {
+		return nil, err
+	}
+	if err := grantingBeyondAccess(currentUser, normalizedKeys); err != nil {
+		return nil, err
 	}
 
 	if isAdminRole(role) && !hasAllPermissionKeys(normalizedKeys) {

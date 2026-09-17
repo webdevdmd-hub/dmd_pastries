@@ -99,4 +99,6 @@ export type UserFormMode = "create" | "edit";
 export type UserRoleOption = {
   id: string;
   name: string;
+  /** False when the role has permissions the current user lacks. */
+  grantable?: boolean;
 };

@@ -64,6 +64,7 @@
     "test:batch-wastage": "node scripts/check-batch-wastage.mjs",
     "test:accounting-labels": "node scripts/check-accounting-labels.mjs",
     "test:manual-journal-actions": "node scripts/check-manual-journal-actions.mjs",
+    "test:role-grants": "node scripts/check-role-grants.mjs",
     "test:supplier-payment-subject": "node scripts/check-supplier-payment-subject.mjs",
     "test:zero-total-checkout": "node scripts/check-zero-total-checkout.mjs"
   },

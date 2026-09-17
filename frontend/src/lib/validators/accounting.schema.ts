@@ -119,10 +119,17 @@ export const accountTransferSchema = z
     toPaymentAccountId: z.string().trim().min(1, "Target account is required."),
     transferDate: z.string().trim().min(1, "Transfer date is required."),
   })
-  .refine((value) => value.fromPaymentAccountId !== value.toPaymentAccountId, {
-    message: "Source and target accounts must be different.",
-    path: ["toPaymentAccountId"],
-  });
+  // Only once both are picked: two empty pickers are not "the same account".
+  .refine(
+    (value) =>
+      !value.fromPaymentAccountId ||
+      !value.toPaymentAccountId ||
+      value.fromPaymentAccountId !== value.toPaymentAccountId,
+    {
+      message: "Source and target accounts must be different.",
+      path: ["toPaymentAccountId"],
+    },
+  );
 
 export const platformSettlementDeductionSchema = z.object({
   amount: z.number().min(0, "Deduction amount cannot be negative."),

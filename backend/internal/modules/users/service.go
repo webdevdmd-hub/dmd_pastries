@@ -113,6 +113,9 @@ func (s *Service) CreateInvitation(currentUser *utils.AuthContext, req CreateInv
 		}
 		return nil, apperrors.Internal("failed to load role")
 	}
+	if err := s.ensureCanGrantRole(currentUser, role); err != nil {
+		return nil, err
+	}
 
 	resolvedBranchID, err := s.resolveInvitationBranch(currentUser, role.RoleName, req.BranchID)
 	if err != nil {
@@ -240,6 +243,11 @@ func (s *Service) ResendInvitation(currentUser *utils.AuthContext, invitationID,
 	if err := s.ensureTargetUserBranch(currentUser, invite.BranchID); err != nil {
 		return nil, err
 	}
+	// Resending returns a fresh link to the caller, who could accept it
+	// themselves: an invitation is only as grantable as its role.
+	if err := s.ensureCanGrantInvitationRole(currentUser, invite); err != nil {
+		return nil, err
+	}
 	if invite.Status != "pending" {
 		return nil, apperrors.BadRequest("only pending invitations can be resent", nil)
 	}
@@ -295,6 +303,11 @@ func (s *Service) CancelInvitation(currentUser *utils.AuthContext, invitationID,
 		return nil, apperrors.Internal("failed to fetch invitation")
 	}
 	if err := s.ensureTargetUserBranch(currentUser, invite.BranchID); err != nil {
+		return nil, err
+	}
+	// Resending returns a fresh link to the caller, who could accept it
+	// themselves: an invitation is only as grantable as its role.
+	if err := s.ensureCanGrantInvitationRole(currentUser, invite); err != nil {
 		return nil, err
 	}
 	if invite.Status != "pending" {
@@ -458,6 +471,9 @@ func (s *Service) CreateUser(currentUser *utils.AuthContext, req CreateUserReque
 		}
 		return nil, apperrors.Internal("failed to load role")
 	}
+	if err := s.ensureCanGrantRole(currentUser, role); err != nil {
+		return nil, err
+	}
 
 	resolvedBranchID, err := s.resolveAssignableBranch(currentUser, req.BranchID)
 	if err != nil {
@@ -555,6 +571,9 @@ func (s *Service) InviteUser(currentUser *utils.AuthContext, req InviteUserReque
 			return nil, apperrors.BadRequest("invalid role_id", nil)
 		}
 		return nil, apperrors.Internal("failed to load role")
+	}
+	if err := s.ensureCanGrantRole(currentUser, role); err != nil {
+		return nil, err
 	}
 
 	if err := s.validateBranch(currentUser.BusinessID, req.BranchID); err != nil {
@@ -662,6 +681,9 @@ func (s *Service) UpdateUser(currentUser *utils.AuthContext, userID string, req 
 	if err := s.ensureTargetUserBranch(currentUser, user.BranchID); err != nil {
 		return nil, err
 	}
+	if err := s.ensureCanManageUser(currentUser, user); err != nil {
+		return nil, err
+	}
 
 	updates := map[string]interface{}{}
 	if req.FullName != "" {
@@ -677,6 +699,12 @@ func (s *Service) UpdateUser(currentUser *utils.AuthContext, userID string, req 
 				return nil, apperrors.BadRequest("invalid role_id", nil)
 			}
 			return nil, apperrors.Internal("failed to load role")
+		}
+		if err := s.ensureCanGrantRole(currentUser, role); err != nil {
+			return nil, err
+		}
+		if err := s.ensureAccessKept(currentUser, user, "", role); err != nil {
+			return nil, err
 		}
 		updates["role_id"] = role.ID
 	}
@@ -760,6 +788,9 @@ func (s *Service) DeleteUser(currentUser *utils.AuthContext, userID string, ipAd
 	if err := s.ensureTargetUserBranch(currentUser, user.BranchID); err != nil {
 		return nil, err
 	}
+	if err := s.ensureCanManageUser(currentUser, user); err != nil {
+		return nil, err
+	}
 
 	business, err := s.businessRepo.FindByID(currentUser.BusinessID)
 	if err != nil {
@@ -838,6 +869,9 @@ func (s *Service) RestoreUser(currentUser *utils.AuthContext, userID string, ipA
 	if err := s.ensureTargetUserBranch(currentUser, user.BranchID); err != nil {
 		return nil, err
 	}
+	if err := s.ensureCanManageUser(currentUser, user); err != nil {
+		return nil, err
+	}
 
 	tx := s.db.Begin()
 	if tx.Error != nil {
@@ -895,6 +929,9 @@ func (s *Service) AssignUserBranch(currentUser *utils.AuthContext, userID string
 		return nil, apperrors.Internal("failed to fetch user")
 	}
 	if err := s.ensureTargetUserBranch(currentUser, user.BranchID); err != nil {
+		return nil, err
+	}
+	if err := s.ensureCanManageUser(currentUser, user); err != nil {
 		return nil, err
 	}
 
@@ -1013,6 +1050,14 @@ func (s *Service) UpdateUserStatus(currentUser *utils.AuthContext, userID string
 		return nil, apperrors.Internal("failed to fetch user")
 	}
 	if err := s.ensureTargetUserBranch(currentUser, user.BranchID); err != nil {
+		return nil, err
+	}
+	if err := s.ensureCanManageUser(currentUser, user); err != nil {
+		return nil, err
+	}
+	// Deleting already refused the owner and the last admin; suspending them
+	// did not, which locked the business out just the same.
+	if err := s.ensureAccessKept(currentUser, user, req.Status, nil); err != nil {
 		return nil, err
 	}
 
@@ -1210,6 +1255,10 @@ func (s *Service) CreatePasswordResetLink(currentUser *utils.AuthContext, userID
 		if err == gorm.ErrRecordNotFound {
 			return nil, apperrors.NotFound("user not found")
 		}
+		return nil, err
+	}
+	// A reset link is as good as the password: never for a role above yours.
+	if err := s.ensureCanManageUser(currentUser, user); err != nil {
 		return nil, err
 	}
 	if user.Status != "active" && user.Status != "invited" {

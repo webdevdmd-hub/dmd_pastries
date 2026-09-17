@@ -165,12 +165,17 @@ function BalanceSheetRows({
       </tr>
       {groups.map((group) => (
         <Fragment key={`${title}-${group.group}`}>
-          <tr className="border-b border-border">
-            <td className="pl-6 pr-3 py-3 sm:px-10 font-semibold text-foreground">{group.group}</td>
-            {/* A group heading has no amount of its own; 0.00 here read as a
+          {/* The section title already names a lone same-named group ("Equity"). */}
+          {groups.length > 1 || group.group !== title ? (
+            <tr className="border-b border-border">
+              <td className="pl-6 pr-3 py-3 sm:px-10 font-semibold text-foreground">
+                {group.group}
+              </td>
+              {/* A group heading has no amount of its own; 0.00 here read as a
                 zero balance. */}
-            <td />
-          </tr>
+              <td />
+            </tr>
+          ) : null}
           {group.items.map((item, itemIndex) => (
             <tr
               className="border-b border-border transition-colors hover:bg-muted"
