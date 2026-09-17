@@ -61,6 +61,7 @@ import {
   useUsers,
 } from "@/hooks/use-users";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
+import { isRoleGrantable } from "@/lib/roles/grantable";
 import type { CreateStaffInvitationPayload, StaffInvitation } from "@/types/invitation";
 import type { Permission } from "@/types/permission";
 import type { Role } from "@/types/role";
@@ -100,8 +101,9 @@ function buildRoleOptions(users: User[]): UserRoleOption[] {
   return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
 }
 
-function buildRoleOptionsFromRoles(roles: Role[]): UserRoleOption[] {
+function buildRoleOptionsFromRoles(roles: Role[], heldPermissions: string[]): UserRoleOption[] {
   return roles.map((role) => ({
+    grantable: isRoleGrantable(role.permissionKeys, heldPermissions),
     id: role.id,
     name: role.roleName,
   }));
@@ -140,6 +142,7 @@ function hasAnyPermission(
 export function UsersPageClient(): JSX.Element {
   const router = useRouter();
   const { logout, refreshProfile, user } = useAuth();
+  const heldPermissions = useMemo<string[]>(() => user?.permissions ?? [], [user?.permissions]);
   const branchScope = useBranchScope();
   const [filters, setFilters] = useState<UserFiltersType>(defaultFilters);
   const [dialogMode, setDialogMode] = useState<UserFormMode>("create");
@@ -213,11 +216,11 @@ export function UsersPageClient(): JSX.Element {
     filters.search.trim().length > 0 || filters.status !== defaultFilters.status;
   const roleOptions = useMemo(() => {
     if (rolesQuery.data && rolesQuery.data.length > 0) {
-      return buildRoleOptionsFromRoles(rolesQuery.data);
+      return buildRoleOptionsFromRoles(rolesQuery.data, heldPermissions);
     }
 
     return buildRoleOptions(data ?? []);
-  }, [data, rolesQuery.data]);
+  }, [data, heldPermissions, rolesQuery.data]);
   const branchNameById = useMemo(
     () => new Map((branchesQuery.data ?? []).map((branch) => [branch.id, branch.name])),
     [branchesQuery.data],

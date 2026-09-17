@@ -234,8 +234,13 @@ export function InviteUserDialog({
                       </FormControl>
                       <SelectContent>
                         {roleOptions.map((roleOption) => (
-                          <SelectItem key={roleOption.id} value={roleOption.id}>
+                          <SelectItem
+                            disabled={roleOption.grantable === false}
+                            key={roleOption.id}
+                            value={roleOption.id}
+                          >
                             {roleOption.name}
+                            {roleOption.grantable === false ? " (beyond your access)" : ""}
                           </SelectItem>
                         ))}
                       </SelectContent>

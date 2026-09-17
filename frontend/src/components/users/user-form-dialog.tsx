@@ -68,6 +68,12 @@ type UserFormDialogProps = {
 };
 
 const statusOptions = ["active", "inactive", "suspended", "invited"] as const;
+const statusLabels: Record<(typeof statusOptions)[number], string> = {
+  active: "Active",
+  inactive: "Inactive",
+  invited: "Invited",
+  suspended: "Suspended",
+};
 const unassignedBranchValue = "__unassigned__";
 
 function getBranchSelectValue(branchId: string | null): string {
@@ -246,7 +252,7 @@ export function UserFormDialog({
           <DialogTitle>{mode === "create" ? "Add staff user" : "Edit staff user"}</DialogTitle>
           <DialogDescription>
             {mode === "create"
-              ? "Create a new staff account connected to the existing backend users API."
+              ? "Create a staff account with a temporary password they can change after signing in."
               : "Update the selected staff profile, access role, and account status."}
           </DialogDescription>
         </DialogHeader>
@@ -382,8 +388,13 @@ export function UserFormDialog({
                           </FormControl>
                           <SelectContent>
                             {roleOptions.map((roleOption) => (
-                              <SelectItem key={roleOption.id} value={roleOption.id}>
+                              <SelectItem
+                                disabled={roleOption.grantable === false}
+                                key={roleOption.id}
+                                value={roleOption.id}
+                              >
                                 {roleOption.name}
+                                {roleOption.grantable === false ? " (beyond your access)" : ""}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -447,7 +458,7 @@ export function UserFormDialog({
                           <SelectContent>
                             {statusOptions.map((status) => (
                               <SelectItem key={status} value={status}>
-                                {status}
+                                {statusLabels[status]}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -581,8 +592,13 @@ export function UserFormDialog({
                           </FormControl>
                           <SelectContent>
                             {roleOptions.map((roleOption) => (
-                              <SelectItem key={roleOption.id} value={roleOption.id}>
+                              <SelectItem
+                                disabled={roleOption.grantable === false}
+                                key={roleOption.id}
+                                value={roleOption.id}
+                              >
                                 {roleOption.name}
+                                {roleOption.grantable === false ? " (beyond your access)" : ""}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -663,7 +679,7 @@ export function UserFormDialog({
                           <SelectContent>
                             {statusOptions.map((status) => (
                               <SelectItem key={status} value={status}>
-                                {status}
+                                {statusLabels[status]}
                               </SelectItem>
                             ))}
                           </SelectContent>
