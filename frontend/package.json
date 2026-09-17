@@ -62,6 +62,7 @@
     "test:purchasing-supplier-use": "node scripts/check-purchasing-supplier-use.mjs",
     "test:recipe-field-errors": "node scripts/check-recipe-field-errors.mjs",
     "test:batch-wastage": "node scripts/check-batch-wastage.mjs",
+    "test:manual-journal-actions": "node scripts/check-manual-journal-actions.mjs",
     "test:supplier-payment-subject": "node scripts/check-supplier-payment-subject.mjs",
     "test:zero-total-checkout": "node scripts/check-zero-total-checkout.mjs"
   },

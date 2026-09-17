@@ -1831,10 +1831,14 @@ export async function postJournalEntry(id: string): Promise<JournalEntry> {
 }
 
 export async function reverseJournalEntry(id: string): Promise<JournalEntry> {
-  const response = await apiRequest<JournalEntry>(
+  const response = await apiRequest<JournalEntry, Record<string, never>>(
     `/api/v1/accounting/journal-entries/${id}/reverse`,
     {
       authMode: "appwrite",
+      // The server binds a JSON body; with none it answered "invalid request
+      // payload" and no journal could be reversed. Every field defaults.
+      // (ISSUE-047)
+      body: {},
       method: "POST",
       parse: parseJournalEntry,
     },

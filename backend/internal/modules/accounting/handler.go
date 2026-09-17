@@ -1,6 +1,8 @@
 package accounting
 
 import (
+	"errors"
+	"io"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -691,8 +693,12 @@ func (h *Handler) ReverseJournalEntry(c *gin.Context) {
 	if !validUUIDParam(c, "id") {
 		return
 	}
+	// Every field is optional -- date, reference and narration all default --
+	// and the journal page sends no body. Binding an empty body failed with
+	// "invalid request payload" (EOF), so no journal could be reversed.
+	// (ISSUE-047)
 	var req ReverseJournalEntryRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
 		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
 		return
 	}
