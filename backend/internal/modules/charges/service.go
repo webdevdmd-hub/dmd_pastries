@@ -112,7 +112,9 @@ func ReplaceChargesWithMode(tx *gorm.DB, businessID, branchID, documentType, doc
 		return ChargeTotals{}, err
 	}
 	if len(rows) > 0 {
-		if err := tx.Create(&rows).Error; err != nil {
+		// Select("*"): IsRefundable is tagged default:true, so a plain Create
+		// saved a non-refundable charge as refundable. (ISSUE-061)
+		if err := tx.Select("*").Create(&rows).Error; err != nil {
 			return ChargeTotals{}, err
 		}
 	}
@@ -143,7 +145,7 @@ func CopyCharges(tx *gorm.DB, businessID, branchID, fromType, fromID, toType, to
 		totals.Total = roundMoney(totals.Total + row.TotalAmount)
 	}
 	if len(copied) > 0 {
-		if err := tx.Create(&copied).Error; err != nil {
+		if err := tx.Select("*").Create(&copied).Error; err != nil {
 			return ChargeTotals{}, err
 		}
 	}

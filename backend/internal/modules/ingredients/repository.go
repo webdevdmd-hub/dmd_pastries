@@ -16,8 +16,13 @@ type Repository struct {
 
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
+// Select("*") writes every column. Ingredient carries bool fields tagged
+// gorm:"default:true", and a plain Create treats false as "not set" and leaves
+// it out of the INSERT, so the database default TRUE won: an ingredient created as not
+// stock-tracked or without expiry tracking was saved tracked.
+// (ISSUE-061)
 func (r *Repository) Create(tx *gorm.DB, item *Ingredient) error {
-	return tx.Create(item).Error
+	return tx.Select("*").Create(item).Error
 }
 
 func (r *Repository) FindByID(id, businessID, branchID string) (*Ingredient, error) {
