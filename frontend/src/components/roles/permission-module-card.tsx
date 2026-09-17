@@ -21,11 +21,13 @@ type PermissionModuleCardProps = {
   heldPermissionKeys?: readonly string[] | undefined;
 };
 
+const ACRONYMS: Record<string, string> = { pos: "POS", vat: "VAT" };
+
 function formatLabel(value: string): string {
   return value
     .split(/[._-]/)
     .filter(Boolean)
-    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .map((part) => ACRONYMS[part] ?? `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
     .join(" ");
 }
 

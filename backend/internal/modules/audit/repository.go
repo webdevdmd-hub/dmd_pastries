@@ -85,6 +85,20 @@ func (r *Repository) CreateActivity(tx *gorm.DB, input ActivityInput) error {
 		branchID = nil
 	}
 
+	if IsViewEvent(input.EventType) {
+		var recent int64
+		if err := tx.Model(&AuditLog{}).
+			Where("business_id = ? AND actor_user_id = ? AND event_type = ? AND entity_type = ? AND entity_id = ? AND created_at > ?",
+				input.BusinessID, input.ActorUserID, input.EventType, input.EntityType, input.EntityID,
+				time.Now().UTC().Add(-viewRepeatWindow)).
+			Count(&recent).Error; err != nil {
+			return err
+		}
+		if recent > 0 {
+			return nil
+		}
+	}
+
 	return tx.Create(&AuditLog{
 		ID:           utils.NewUUID(),
 		BusinessID:   input.BusinessID,
@@ -141,6 +155,10 @@ func (r *Repository) ListActivity(filter *ActivityLogFilter) ([]AuditLog, string
 	}
 	if filter.EntityType != "" {
 		query = query.Where("entity_type = ?", filter.EntityType)
+	}
+	// Changes only unless asked: views bury the edits people come here for.
+	if !filter.IncludeViews {
+		query = query.Where("NOT " + viewEventSQL)
 	}
 	if filter.TargetUserID != "" {
 		query = query.Where("actor_user_id = ? OR user_id = ? OR target_user_id = ? OR entity_id = ?", filter.TargetUserID, filter.TargetUserID, filter.TargetUserID, filter.TargetUserID)

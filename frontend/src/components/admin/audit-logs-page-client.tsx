@@ -126,10 +126,11 @@ export function AuditLogsPageClient(): JSX.Element {
       ...(filters.dateFrom ? { dateFrom: filters.dateFrom } : {}),
       ...(filters.dateTo ? { dateTo: filters.dateTo } : {}),
       cursor,
+      includeViews: filters.includeViews,
       limit: 50,
       timezone,
     }),
-    [cursor, filters.dateFrom, filters.dateTo, timezone],
+    [cursor, filters.dateFrom, filters.dateTo, filters.includeViews, timezone],
   );
 
   // Filtering by user hits a different endpoint, so exactly one of these runs.
@@ -146,7 +147,7 @@ export function AuditLogsPageClient(): JSX.Element {
 
   // Any change to what is being asked for restarts the cursor, or page two of
   // the old question gets appended to page one of the new one.
-  const filterKey = `${filters.entityType}|${filters.userId}|${filters.dateFrom}|${filters.dateTo}|${timezone}`;
+  const filterKey = `${filters.entityType}|${filters.userId}|${filters.dateFrom}|${filters.dateTo}|${String(filters.includeViews)}|${timezone}`;
   useEffect(() => {
     setCursor(null);
     setItems([]);
@@ -181,7 +182,8 @@ export function AuditLogsPageClient(): JSX.Element {
     filters.entityType !== "all" ||
     filters.userId.length > 0 ||
     filters.dateFrom.length > 0 ||
-    filters.dateTo.length > 0;
+    filters.dateTo.length > 0 ||
+    filters.includeViews;
   const isFirstLoad = activeQuery.isLoading && cursor === null;
   const groups = groupByDay(items, timezone);
 

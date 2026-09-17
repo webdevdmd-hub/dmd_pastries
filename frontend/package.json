@@ -61,6 +61,7 @@
     "test:product-flag-labels": "node scripts/check-product-flag-labels.mjs",
     "test:purchasing-supplier-use": "node scripts/check-purchasing-supplier-use.mjs",
     "test:recipe-field-errors": "node scripts/check-recipe-field-errors.mjs",
+    "test:audit-views": "node scripts/check-audit-views.mjs",
     "test:batch-wastage": "node scripts/check-batch-wastage.mjs",
     "test:accounting-labels": "node scripts/check-accounting-labels.mjs",
     "test:manual-journal-actions": "node scripts/check-manual-journal-actions.mjs",

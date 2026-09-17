@@ -43,6 +43,7 @@ type ActivityLogQuery struct {
 	DateFrom     string
 	DateTo       string
 	Timezone     string
+	IncludeViews bool
 }
 
 type ActivityUserDisplay struct {

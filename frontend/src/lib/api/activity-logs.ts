@@ -230,6 +230,10 @@ function buildActivityLogSearchParams(filters: ActivityLogFilters): string {
     params.set("timezone", filters.timezone);
   }
 
+  if (filters.includeViews) {
+    params.set("include_views", "true");
+  }
+
   const query = params.toString();
   return query ? `?${query}` : "";
 }

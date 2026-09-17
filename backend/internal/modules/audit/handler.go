@@ -27,6 +27,8 @@ func (h *Handler) ListActivityLogs(c *gin.Context) {
 			DateFrom:   c.Query("date_from"),
 			DateTo:     c.Query("date_to"),
 			Timezone:   c.Query("timezone"),
+			// "Include views" on the Audit Logs page.
+			IncludeViews: c.Query("include_views") == "true",
 		},
 	)
 	if err != nil {
