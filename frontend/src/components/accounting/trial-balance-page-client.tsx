@@ -352,8 +352,8 @@ export function TrialBalancePageClient(): JSX.Element {
                               <td className="pl-6 pr-3 py-3 sm:px-10 font-semibold text-foreground">
                                 {formatGroupName(group.group)}
                               </td>
-                              <AmountCell value={0} />
-                              <AmountCell value={0} />
+                              <td />
+                              <td />
                             </tr>
                             {group.items.map((item) => (
                               <tr

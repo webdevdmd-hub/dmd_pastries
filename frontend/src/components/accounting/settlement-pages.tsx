@@ -70,6 +70,7 @@ import {
 } from "@/hooks/use-accounting";
 import { useBranchOptions } from "@/hooks/use-lookups";
 import { usePermission } from "@/hooks/use-permission";
+import { accountOptionDescription } from "@/lib/accounting/labels";
 import { getErrorMessage } from "@/lib/api/client";
 import { isLedgerAllowedForContext } from "@/lib/selectors/eligibility";
 import {
@@ -155,7 +156,7 @@ function accountOptions(accounts: ChartAccount[]): SearchableComboboxOption[] {
   return accounts.map((account) => ({
     value: account.id,
     label: `${account.accountCode} - ${account.accountName}`,
-    description: `${account.accountType.replace("_", " ")} / ${account.accountGroup.replaceAll("_", " ")}`,
+    description: accountOptionDescription(account),
     keywords: [account.accountCode, account.accountName, account.accountGroup, account.accountType],
     disabled: account.status !== "active",
   }));
@@ -814,7 +815,10 @@ function AccountTransferDialog({
     const payload = transferPayload(form);
     const parsed = accountTransferSchema.safeParse(payload);
     if (!parsed.success) {
-      toast.error(parsed.error.issues[0]?.message ?? "Transfer payload is invalid.");
+      // Name every gap at once: it reported only the amount, then the next
+      // field on the next try. (ISSUE-053)
+      const messages = [...new Set(parsed.error.issues.map((issue) => issue.message))];
+      toast.error(messages.join(" ") || "Check the transfer details.");
       return;
     }
 

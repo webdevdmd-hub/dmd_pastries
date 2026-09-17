@@ -54,6 +54,11 @@ import {
 } from "@/hooks/use-accounting";
 import { useBranchOptions } from "@/hooks/use-lookups";
 import { usePermission } from "@/hooks/use-permission";
+import {
+  accountOptionDescription,
+  humanizeAccountingValue,
+  journalSourceLabel,
+} from "@/lib/accounting/labels";
 import type {
   AccountingBackfillPayload,
   AccountingBackfillReadinessIssue,
@@ -123,12 +128,9 @@ function formatNumber(value: number): string {
   }).format(value);
 }
 
+// Also names backfill targets ("pos_sales" -> "POS Sales").
 function formatStatus(value: string): string {
-  return value
-    .split("_")
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
+  return journalSourceLabel(value);
 }
 
 function formatBackfillTarget(value: string): string {
@@ -206,7 +208,7 @@ function chartAccountOptions(accounts: ChartAccount[]): SearchableComboboxOption
   return accounts.map((account) => ({
     value: account.id,
     label: `${account.accountCode} - ${account.accountName}`,
-    description: `${account.accountType} / ${account.accountGroup}`,
+    description: accountOptionDescription(account),
     keywords: [
       account.accountCode,
       account.accountName,
@@ -265,7 +267,7 @@ export function AccountingSettingsPageClient(): JSX.Element {
             <Link href={ROUTES.accountingBalanceSheet}>Open Balance Sheet</Link>
           </Button>
         }
-        description="Control the financial-year start used by backend accounting reports."
+        description="Set when the financial year starts for accounting reports."
         title="Accounting Settings"
       />
 
@@ -279,7 +281,7 @@ export function AccountingSettingsPageClient(): JSX.Element {
               {settings?.financialYearStartLabel ?? "Loading..."}
             </p>
             <p className="text-sm text-muted-foreground">
-              {settings?.usesDefaultFinancialYear ? "Using backend default" : "Custom setting"}
+              {settings?.usesDefaultFinancialYear ? "Default (January 1)" : "Custom setting"}
             </p>
           </div>
           <div className="flex flex-col gap-2">
@@ -324,7 +326,7 @@ export function AccountingSettingsPageClient(): JSX.Element {
 
         <div className="mt-5 flex items-center justify-between gap-3 border-t pt-4">
           <p className="text-sm text-muted-foreground">
-            Reports remain backend-authoritative. This page only saves the report period setting.
+            This only changes the period reports use. Posted journals are not changed.
           </p>
           <Button
             disabled={!canManage || updateSettings.isPending}
@@ -642,7 +644,7 @@ export function AccountMappingsPageClient(): JSX.Element {
             </Button>
           </div>
         }
-        description="Review backend account mappings used by automated journals and recovery tools."
+        description="Choose which ledger account each automatic journal posts to."
         title="Account Mappings"
       />
 
@@ -676,10 +678,10 @@ export function AccountMappingsPageClient(): JSX.Element {
             >
               <div>
                 <p className="font-semibold text-foreground [overflow-wrap:anywhere]">
-                  {mapping.mappingKey}
+                  {mapping.description || humanizeAccountingValue(mapping.mappingKey)}
                 </p>
-                <p className="text-sm text-muted-foreground">
-                  {mapping.description || "No description"}
+                <p className="font-mono text-meta text-muted-foreground [overflow-wrap:anywhere]">
+                  {mapping.mappingKey}
                 </p>
               </div>
               <div className="flex flex-col gap-2">
@@ -712,10 +714,11 @@ export function AccountMappingsPageClient(): JSX.Element {
               </div>
               <p className="text-sm text-muted-foreground">
                 {selectedAccount
-                  ? `${selectedAccount.accountType} / ${selectedAccount.accountGroup}`
+                  ? accountOptionDescription(selectedAccount)
                   : [mapping.chartAccountType, mapping.chartAccountGroup]
                       .filter(Boolean)
-                      .join(" / ") || "-"}
+                      .map((part) => humanizeAccountingValue(part))
+                      .join(" · ") || "-"}
               </p>
               <Badge
                 className={
@@ -827,7 +830,7 @@ function ReconciliationSection({
             <div>
               <p className="font-semibold text-foreground">{item.label}</p>
               <p className="text-sm text-muted-foreground">
-                {item.details || "Backend reconciliation check"}
+                {item.details || "Reconciliation check"}
               </p>
             </div>
             <StatusBadge matched={item.isMatched} status={item.status} />
@@ -842,7 +845,7 @@ function ReconciliationSection({
         ))}
         {!isLoading && !errorMessage && items.length === 0 ? (
           <EmptyState
-            description="Rows appear once inventory movements have been posted for this period."
+            description="No checks were returned for this section."
             icon={Scale}
             title="No reconciliation rows"
           />
@@ -872,7 +875,13 @@ export function AccountingReconciliationPageClient(): JSX.Element {
     arQuery.data,
     paymentAccountsQuery.data,
   ];
-  const allRows = responses.flatMap((response) => response?.items ?? []);
+  // The health check repeats the inventory, payable and receivable checks
+  // that also have their own sections; count each check once.
+  const allRows = [
+    ...new Map(
+      responses.flatMap((response) => response?.items ?? []).map((item) => [item.id, item]),
+    ).values(),
+  ];
   const unmatchedRows = allRows.filter((item) => !item.isMatched);
   const totalDifference = allRows.reduce((sum, item) => sum + Math.abs(item.difference), 0);
   const isFetching =
@@ -969,7 +978,7 @@ export function AccountingReconciliationPageClient(): JSX.Element {
         </RecoveryCard>
         <RecoveryCard title="Total difference">
           <p className="text-3xl font-semibold text-foreground">{formatNumber(totalDifference)}</p>
-          <p className="text-sm text-muted-foreground">Absolute difference from backend checks.</p>
+          <p className="text-sm text-muted-foreground">Sum of the differences across all checks.</p>
         </RecoveryCard>
       </div>
 

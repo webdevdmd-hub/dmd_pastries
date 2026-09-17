@@ -3639,6 +3639,21 @@ func (r *Repository) SumChartAccountOpenings(businessID, branchID string) (float
 	return roundMoney(total), err
 }
 
+// SumOpeningStockValue totals live opening-stock movements: the value the
+// inventory module credited to 3400. The opening balances summary listed every
+// other source of 3400 but not this one. (ISSUE-053)
+func (r *Repository) SumOpeningStockValue(businessID, branchID string) (float64, error) {
+	var total float64
+	db := r.db.Table("stock_movements").
+		Select("COALESCE(SUM(total_cost), 0)").
+		Where("business_id = ? AND movement_type = 'opening_stock' AND is_reversal = FALSE AND is_reversed = FALSE", businessID)
+	if strings.TrimSpace(branchID) != "" {
+		db = db.Where("branch_id = ?", strings.TrimSpace(branchID))
+	}
+	err := db.Scan(&total).Error
+	return roundMoney(total), err
+}
+
 func (r *Repository) SumPaymentAccountOpenings(businessID, branchID string) (float64, error) {
 	var total float64
 	db := r.db.Table("payment_accounts").

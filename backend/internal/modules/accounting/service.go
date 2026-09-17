@@ -3178,7 +3178,7 @@ func (s *Service) PostInventoryMovementJournal(tx *gorm.DB, currentUser *utils.A
 		)
 		return "", nil
 	}
-	journalID, err := s.createPostedSystemJournal(tx, currentUser, movement.CreatedAt, movement.BranchID, sourceType, movement.ID, movement.ReferenceNumber, "Inventory movement "+movement.MovementType, lines)
+	journalID, err := s.createPostedSystemJournal(tx, currentUser, movement.CreatedAt, movement.BranchID, sourceType, movement.ID, movement.ReferenceNumber, "Inventory movement "+strings.ReplaceAll(movement.MovementType, "_", " "), lines)
 	if err != nil {
 		return "", err
 	}
@@ -4100,7 +4100,7 @@ func (s *Service) GetInventoryReconciliation(currentUser *utils.AuthContext, que
 	if err != nil {
 		return nil, err
 	}
-	check := reconciliationCheck("inventory", "Inventory valuation vs Inventory ledger", operational, ledger, "Compares inventory_items.inventory_value with the mapped Inventory / Stock ledger.")
+	check := reconciliationCheck("inventory", "Inventory valuation vs Inventory ledger", operational, ledger, "Compares the value of stock on hand with the mapped Inventory / Stock ledger.")
 	_ = s.writeReportAudit(currentUser, "accounting.reconciliation_inventory_viewed", "reconciliation_inventory", query, ipAddress, userAgent)
 	return &check, nil
 }

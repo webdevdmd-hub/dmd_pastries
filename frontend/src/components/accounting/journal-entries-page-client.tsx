@@ -80,6 +80,7 @@ import {
 import { useBranchOptions } from "@/hooks/use-lookups";
 import { useIsDesktop } from "@/hooks/use-media-query";
 import { usePermission } from "@/hooks/use-permission";
+import { accountOptionDescription, journalSourceLabel } from "@/lib/accounting/labels";
 import { getErrorMessage } from "@/lib/api/client";
 import { isLedgerAllowedForContext } from "@/lib/selectors/eligibility";
 import { journalEntrySchema } from "@/lib/validators/accounting.schema";
@@ -122,7 +123,7 @@ const journalOriginTabs = [
 ] as const satisfies readonly FormTab<JournalEntriesFilters["journalOrigin"]>[];
 
 const journalOriginDescriptions: Record<JournalEntriesFilters["journalOrigin"], string> = {
-  all: "Manual and backend-posted accounting journals.",
+  all: "Manual journals and journals posted automatically.",
   manual: "Draft, posted, and reversed manual vouchers.",
   system: "Read-only journals posted automatically from source documents.",
 };
@@ -134,7 +135,7 @@ function journalHeaderDescription(origin: JournalEntriesFilters["journalOrigin"]
   if (origin === "manual") {
     return "Create and manage balanced debit/credit manual accounting vouchers.";
   }
-  return "Review backend-posted accounting journals from sales, purchasing, expenses, inventory, and manufacturing.";
+  return "Review journals posted automatically from sales, purchasing, expenses, inventory, and manufacturing.";
 }
 
 type PendingAction =
@@ -245,11 +246,7 @@ function statusLabel(status: JournalEntryStatus): string {
 }
 
 function sourceLabel(sourceType: string): string {
-  return sourceType
-    .split("_")
-    .filter((part) => part.length > 0)
-    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
-    .join(" ");
+  return journalSourceLabel(sourceType);
 }
 
 function toPayload(state: EntryFormState): CreateJournalEntryPayload {
@@ -352,7 +349,7 @@ function JournalEntryFormDialog({
   const accountComboboxOptions = useMemo<SearchableComboboxOption[]>(
     () =>
       accountOptions.map((account) => ({
-        description: `${account.accountType} · ${account.accountGroup || "No group"} · ${account.normalBalance}`,
+        description: accountOptionDescription(account),
         keywords: [
           account.accountCode,
           account.accountName,
