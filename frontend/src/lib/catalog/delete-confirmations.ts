@@ -101,6 +101,22 @@ export function recipeDeleteConsequence(recipeName: string): string {
   return `${recipeName} and its ingredient and packaging lines are removed, and it stops driving its product's cost. Batches already produced keep their records.`;
 }
 
+/**
+ * A packaging usage rule was deleted on one click, with no success message and
+ * no message when it failed (ISSUE-094).
+ */
+export function packagingRuleDeleteConfirmation(
+  packagingName: string,
+  productName: string,
+): DeleteConfirmation {
+  return {
+    title: `Remove ${packagingName} from ${productName}?`,
+    consequence: `The rule saying ${productName} uses ${packagingName} is deleted. Stock and past records are not changed.`,
+    confirmLabel: "Remove rule",
+    cancelLabel: "Keep rule",
+  };
+}
+
 /** The packaging counterpart of ingredientDeleteConfirmation (ISSUE-083). */
 export function packagingDeleteConfirmation(name: string): DeleteConfirmation {
   return {
