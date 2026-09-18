@@ -89,12 +89,20 @@ func (r *Repository) UpdateAppwriteUserID(tx *gorm.DB, userID, appwriteUserID st
 // provider. Written together so a row can never carry one id and not the other
 // after a partially applied update.
 func (r *Repository) UpdateProviderIDs(tx *gorm.DB, userID string, ids utils.ProviderIDs) error {
-	updates := map[string]interface{}{"appwrite_user_id": ids.Appwrite}
-	// Only touch supabase_user_id when there is one: before cutover it must
-	// stay NULL, and the partial unique index treats NULLs as distinct while an
-	// empty string would collide on the second user.
+	// Only touch a column when its provider returned an id. Both columns carry
+	// a unique index that treats NULLs as distinct and an empty string as a
+	// value, so writing "" for the provider that is not live would collide on
+	// the second account (ISSUE-064: every Create User after the first failed
+	// once Supabase became the only provider).
+	updates := map[string]interface{}{}
+	if appwriteID := ids.AppwriteOrNil(); appwriteID != nil {
+		updates["appwrite_user_id"] = *appwriteID
+	}
 	if supabaseID := ids.SupabaseOrNil(); supabaseID != nil {
 		updates["supabase_user_id"] = *supabaseID
+	}
+	if len(updates) == 0 {
+		return nil
 	}
 	return tx.Model(&User{}).Where("id = ?", userID).Updates(updates).Error
 }
