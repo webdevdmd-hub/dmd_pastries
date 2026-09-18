@@ -385,6 +385,15 @@ func (r *Repository) HardDeleteOrder(tx *gorm.DB, businessID, orderID string) er
 		Delete(&PurchaseOrderItem{}).Error; err != nil {
 		return err
 	}
+	// Revisions are snapshots of this order's own edits and reference it with
+	// no ON DELETE rule, so a revised draft failed here with a foreign-key
+	// violation (ISSUE-092). The caller only gets this far for an order with
+	// no finalized history, so the revisions have nothing left to describe.
+	if err := tx.Unscoped().
+		Where("purchase_order_id = ? AND business_id = ?", orderID, businessID).
+		Delete(&PurchaseOrderRevision{}).Error; err != nil {
+		return err
+	}
 	return updateOne(tx.Unscoped().
 		Where("id = ? AND business_id = ?", orderID, businessID).
 		Delete(&PurchaseOrder{}))
