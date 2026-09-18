@@ -488,7 +488,7 @@ func (s *Service) validateCreate(businessID, branchID string, req CreateProductR
 	if err := validatePreparationTime(req.PreparationTimeMinutes); err != nil {
 		return err
 	}
-	if err := s.validateReferences(businessID, branchID, req.CategoryID, productType, req.UnitID, cleanStringPointer(req.TaxRateID)); err != nil {
+	if err := s.validateReferences(businessID, branchID, req.CategoryID, productType, req.UnitID, cleanStringPointer(req.TaxRateID), nil); err != nil {
 		return err
 	}
 	if err := s.validateUniqueCodes(businessID, branchID, "", strings.TrimSpace(req.SKU), strings.TrimSpace(req.Barcode)); err != nil {
@@ -543,7 +543,7 @@ func (s *Service) validateUpdate(businessID, branchID string, product *Product, 
 		categoryID = req.CategoryID
 	}
 	if req.CategoryID != "" || req.ProductType != "" || req.UnitID != "" || req.TaxRateID != nil {
-		if err := s.validateReferences(businessID, branchID, categoryID, productType, req.UnitID, cleanStringPointer(req.TaxRateID)); err != nil {
+		if err := s.validateReferences(businessID, branchID, categoryID, productType, req.UnitID, cleanStringPointer(req.TaxRateID), product); err != nil {
 			return err
 		}
 	}
@@ -553,13 +553,26 @@ func (s *Service) validateUpdate(businessID, branchID string, product *Product, 
 	return nil
 }
 
-func (s *Service) validateReferences(businessID, branchID, categoryID, productType, unitID string, taxRateID *string) error {
+// validateReferences checks the category, unit and tax rate a product will
+// point at. current is the product being edited, nil on create.
+//
+// Master Data "deletes" a unit or category by marking it inactive. The two
+// were treated differently (ISSUE-089): an inactive category refused every
+// save -- even editing an unrelated field of a product already in it -- while
+// an inactive unit was accepted anywhere. Both now follow referenceUsable.
+func (s *Service) validateReferences(businessID, branchID, categoryID, productType, unitID string, taxRateID *string, current *Product) error {
 	if categoryID != "" {
-		var count int64
-		if err := s.db.Table("product_categories").Where("id = ? AND business_id = ? AND branch_id = ? AND status = ? AND deleted_at IS NULL", categoryID, businessID, branchID, "active").Count(&count).Error; err != nil || count == 0 {
+		status, err := referenceStatus(s.db.Table("product_categories").Where("id = ? AND business_id = ? AND branch_id = ? AND deleted_at IS NULL", categoryID, businessID, branchID))
+		if err != nil {
+			return apperrors.Internal("failed to validate product category")
+		}
+		if status == "" {
 			return apperrors.BadRequest("invalid category_id", nil)
 		}
-		count = 0
+		if err := referenceUsable("category", status, current != nil && current.CategoryID == categoryID); err != nil {
+			return err
+		}
+		var count int64
 		if err := s.db.Table("product_category_allowed_types").Where("business_id = ? AND branch_id = ? AND product_category_id = ? AND product_type = ?", businessID, branchID, categoryID, productType).Count(&count).Error; err != nil {
 			return apperrors.Internal("failed to validate product category type")
 		}
@@ -568,9 +581,15 @@ func (s *Service) validateReferences(businessID, branchID, categoryID, productTy
 		}
 	}
 	if unitID != "" {
-		var count int64
-		if err := s.db.Table("units").Where("id = ? AND (business_id IS NULL OR business_id = ?) AND deleted_at IS NULL", unitID, businessID).Count(&count).Error; err != nil || count == 0 {
+		status, err := referenceStatus(s.db.Table("units").Where("id = ? AND (business_id IS NULL OR business_id = ?) AND deleted_at IS NULL", unitID, businessID))
+		if err != nil {
+			return apperrors.Internal("failed to validate unit")
+		}
+		if status == "" {
 			return apperrors.BadRequest("invalid unit_id", nil)
+		}
+		if err := referenceUsable("unit", status, current != nil && current.UnitID == unitID); err != nil {
+			return err
 		}
 	}
 	if taxRateID != nil {
@@ -580,6 +599,30 @@ func (s *Service) validateReferences(businessID, branchID, categoryID, productTy
 		}
 	}
 	return nil
+}
+
+// referenceStatus reads the status of the one row query matches, or "" when
+// there is none.
+func referenceStatus(query *gorm.DB) (string, error) {
+	var statuses []string
+	if err := query.Limit(1).Pluck("status", &statuses).Error; err != nil {
+		return "", err
+	}
+	if len(statuses) == 0 {
+		return "", nil
+	}
+	return statuses[0], nil
+}
+
+// referenceUsable decides whether a product may point at a category or unit
+// in the given status. An active one always; an inactive one only when the
+// product already points at it, so a product in a category that has since
+// been deactivated can still be edited, but nothing new is filed under it.
+func referenceUsable(kind, status string, unchanged bool) error {
+	if status == "active" || unchanged {
+		return nil
+	}
+	return apperrors.BadRequest("The selected "+kind+" is inactive. Choose an active "+kind+", or reactivate it in Master Data first.", nil)
 }
 
 func (s *Service) validateUniqueCodes(businessID, branchID, productID, sku, barcode string) error {

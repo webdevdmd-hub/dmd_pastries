@@ -65,7 +65,9 @@ func RegisterRoutes(router *gin.Engine, handler *Handler, authGuard gin.HandlerF
 //	GET /api/v1/lookups?kinds=product_categories,units
 //
 // An unknown kind is a 400, so a typo in a form is loud rather than an empty
-// dropdown. Each list is the active records the owning module would return.
+// dropdown. Each list is the active records the owning module would return:
+// units and product categories were returned whole, so forms offered ones
+// Master Data had deactivated (ISSUE-089).
 func (h *Handler) Lookups(c *gin.Context) {
 	requested := strings.Split(c.Query("kinds"), ",")
 	current := utils.MustAuthContext(c)
@@ -86,9 +88,9 @@ func (h *Handler) Lookups(c *gin.Context) {
 		)
 		switch kind {
 		case "product_categories":
-			data, err = h.masterData.ListProductCategories(current, c.Query("product_type"))
+			data, err = h.masterData.ListActiveProductCategories(current, c.Query("product_type"))
 		case "units":
-			data, err = h.masterData.ListUnits(current)
+			data, err = h.masterData.ListActiveUnits(current)
 		case "order_statuses":
 			data, err = h.masterData.ListOrderStatuses(current)
 		case "payment_statuses":

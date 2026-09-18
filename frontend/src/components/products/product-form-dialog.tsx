@@ -27,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { productCategoryOptions, productUnitOptions } from "@/lib/products/reference-options";
 import { isSelectableTaxRate } from "@/lib/selectors/eligibility";
 import { getProductImageUrl, uploadProductImage } from "@/lib/storage/files";
 import { cn } from "@/lib/utils/cn";
@@ -181,14 +182,24 @@ export function ProductFormDialog({
   const watchedPricingPercent = form.watch("pricingPercent");
   const watchedPricingType = form.watch("pricingType");
 
+  // The lookups hold active categories and units only; editing keeps the
+  // product's own, even if since deactivated (ISSUE-089).
+  const categoryOptions = useMemo(
+    () => productCategoryOptions(referenceData.categories, product),
+    [product, referenceData.categories],
+  );
+  const unitOptions = useMemo(
+    () => productUnitOptions(referenceData.units, product),
+    [product, referenceData.units],
+  );
   const compatibleCategories = useMemo(
     () =>
-      referenceData.categories.filter(
+      categoryOptions.filter(
         (category) =>
           category.allowedProductTypes.length === 0 ||
           category.allowedProductTypes.includes(watchedProductType),
       ),
-    [referenceData.categories, watchedProductType],
+    [categoryOptions, watchedProductType],
   );
   const selectedCategoryId = compatibleCategories.some(
     (category) => category.id === watchedCategoryId,
@@ -275,7 +286,7 @@ export function ProductFormDialog({
 
   const handleProductTypeChange = (value: ProductSchema["productType"]): void => {
     const currentCategoryId = form.getValues("categoryId");
-    const categoryStillValid = referenceData.categories.some(
+    const categoryStillValid = categoryOptions.some(
       (category) =>
         category.id === currentCategoryId &&
         (category.allowedProductTypes.length === 0 || category.allowedProductTypes.includes(value)),
@@ -337,7 +348,7 @@ export function ProductFormDialog({
 
   const onSubmit = async (values: ProductSchema): Promise<void> => {
     const selectedUnitId = values.unitId.trim();
-    const unitIsValid = referenceData.units.some((unit) => unit.id === selectedUnitId);
+    const unitIsValid = unitOptions.some((unit) => unit.id === selectedUnitId);
     if (!selectedUnitId || !unitIsValid) {
       form.setError("unitId", {
         message: selectedUnitId ? "Select a valid unit." : "Unit is required.",
@@ -571,9 +582,9 @@ export function ProductFormDialog({
                             <SelectValue placeholder="Select unit" />
                           </SelectTrigger>
                           <SelectContent>
-                            {referenceData.units.map((unit) => (
+                            {unitOptions.map((unit) => (
                               <SelectItem key={unit.id} value={unit.id}>
-                                {unit.unitName} ({unit.symbol})
+                                {unit.label}
                               </SelectItem>
                             ))}
                           </SelectContent>

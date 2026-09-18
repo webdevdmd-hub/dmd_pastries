@@ -355,9 +355,15 @@ func (r *Repository) FindSimpleCategory(table, id, businessID, branchID string) 
 	return &category, nil
 }
 
-func (r *Repository) SimpleNameExists(table, businessID, branchID, name, excludedID string) (bool, error) {
+// SimpleNameExists checks an ingredient or packaging category name across the
+// whole business, every branch, because that is what the database enforces:
+// the unique indexes from migration 000005 are on (business_id,
+// lower(category_name)), and branch ownership (000032) never narrowed them.
+// Checking one branch let a name used by another branch through to the
+// INSERT, which failed on the index as a 500 (ISSUE-089).
+func (r *Repository) SimpleNameExists(table, businessID, _, name, excludedID string) (bool, error) {
 	var count int64
-	query := r.db.Table(table).Where("business_id = ? AND branch_id = ? AND LOWER(category_name) = LOWER(?) AND deleted_at IS NULL", businessID, branchID, name)
+	query := r.db.Table(table).Where("business_id = ? AND LOWER(category_name) = LOWER(?) AND deleted_at IS NULL", businessID, name)
 	if excludedID != "" {
 		query = query.Where("id <> ?", excludedID)
 	}
@@ -365,10 +371,12 @@ func (r *Repository) SimpleNameExists(table, businessID, branchID, name, exclude
 	return count > 0, err
 }
 
-func (r *Repository) SimpleNameExistsTx(tx *gorm.DB, table, businessID, branchID, name string) (bool, error) {
+// SimpleNameExistsTx is SimpleNameExists inside a transaction, business-wide
+// for the same reason.
+func (r *Repository) SimpleNameExistsTx(tx *gorm.DB, table, businessID, _, name string) (bool, error) {
 	var count int64
 	err := tx.Table(table).
-		Where("business_id = ? AND branch_id = ? AND LOWER(category_name) = LOWER(?) AND deleted_at IS NULL", businessID, branchID, name).
+		Where("business_id = ? AND LOWER(category_name) = LOWER(?) AND deleted_at IS NULL", businessID, name).
 		Count(&count).Error
 	return count > 0, err
 }
