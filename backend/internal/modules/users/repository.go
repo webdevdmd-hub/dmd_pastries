@@ -193,6 +193,16 @@ func (r *Repository) HardDeleteByBusinessID(tx *gorm.DB, userID, businessID stri
 	if result.RowsAffected == 0 {
 		return false, apperrors.NotFound("user not found")
 	}
+	// Some references to users are DEFERRABLE INITIALLY DEFERRED (customers,
+	// customer notes), so the DELETE succeeds and the violation would only
+	// surface at COMMIT, after the login is gone. Check them now, inside the
+	// savepoint, so they fall back to keeping the record like any other.
+	if err := tx.Exec("SET CONSTRAINTS ALL IMMEDIATE").Error; err != nil {
+		if isForeignKeyViolation(err) {
+			return false, tx.RollbackTo("erase_user").Error
+		}
+		return false, err
+	}
 	return true, nil
 }
 

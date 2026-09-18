@@ -993,6 +993,13 @@ func (s *Service) hardDeleteUser(
 		tx.Rollback()
 		return nil, apperrors.BadRequest("hard delete requires a soft-deleted user", nil)
 	}
+	// Some references to users are deferred to COMMIT (customers, customer
+	// notes). Check them now, before the login is removed, so a protected
+	// reference refuses the delete instead of failing after the login is gone.
+	if err := tx.Exec("SET CONSTRAINTS ALL IMMEDIATE").Error; err != nil {
+		tx.Rollback()
+		return nil, apperrors.Internal("hard delete failed; database still has protected references")
+	}
 
 	// The login goes with the row. It used to survive, orphaned, holding the
 	// email and phone with nothing in the app able to reach it (ISSUE-075).
