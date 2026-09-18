@@ -691,24 +691,43 @@ func (s *Service) SetDefaultSalesChannel(currentUser *utils.AuthContext, id stri
 }
 
 func (s *Service) DeleteSalesChannel(currentUser *utils.AuthContext, id string, ipAddress, userAgent string) error {
+	channel, err := s.repo.FindSalesChannel(id, currentUser.BusinessID)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return apperrors.NotFound("sales channel not found")
+		}
+		return apperrors.Internal("failed to fetch sales channel")
+	}
+	// A till sale with no channel chosen goes to the default, so deleting it
+	// would quietly move those sales to whichever channel sorts first. The
+	// settings screen already hides Delete for the default; the server now
+	// agrees with it.
+	if channel.IsDefault {
+		return apperrors.Conflict("sales channel is the default; make another channel the default before deleting it", nil)
+	}
 	tx := s.db.Begin()
 	if tx.Error != nil {
 		return apperrors.Internal("failed to start transaction")
 	}
-	updates := map[string]interface{}{"status": "inactive", "is_default": false, "updated_at": time.Now().UTC()}
+	// A real soft delete (ISSUE-080). Setting only the status left the row
+	// listed and its name taken after a dialog that said it was deleted.
+	// Sales and orders keep their channel name snapshot, and every lookup the
+	// till and order screens use already skips deleted rows.
+	now := time.Now().UTC()
+	updates := map[string]interface{}{"status": "inactive", "is_default": false, "updated_at": now, "deleted_at": gorm.DeletedAt{Time: now, Valid: true}}
 	if err := s.repo.UpdateSalesChannel(tx, id, currentUser.BusinessID, updates); err != nil {
 		tx.Rollback()
 		if err == gorm.ErrRecordNotFound {
 			return apperrors.NotFound("sales channel not found")
 		}
-		return apperrors.Internal("failed to deactivate sales channel")
+		return apperrors.Internal("failed to delete sales channel")
 	}
-	if err := s.writeSettingsAudit(tx, currentUser, "sales_channel.deleted", "sales_channel", id, "Sales channel deactivated.", ipAddress, userAgent); err != nil {
+	if err := s.writeSettingsAudit(tx, currentUser, "sales_channel.deleted", "sales_channel", id, "Sales channel deleted.", ipAddress, userAgent); err != nil {
 		tx.Rollback()
 		return err
 	}
 	if err := tx.Commit().Error; err != nil {
-		return apperrors.Internal("failed to commit sales channel deactivation")
+		return apperrors.Internal("failed to commit sales channel deletion")
 	}
 	return nil
 }

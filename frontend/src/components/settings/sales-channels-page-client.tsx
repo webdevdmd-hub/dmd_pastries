@@ -388,9 +388,10 @@ export function SalesChannelsPageClient(): JSX.Element {
     const confirmed = await confirm({
       cancelLabel: "Keep channel",
       confirmLabel: "Delete channel",
-      consequence: `This permanently deletes ${channel.channelName}. It cannot be undone.`,
-      detail:
-        "Orders already recorded against it keep their channel name, but no new order can use it.",
+      // A soft delete: past sales and orders carry the name themselves, and
+      // the name is free to use again afterwards.
+      consequence: `This removes ${channel.channelName} from your sales channels. Past sales and orders keep showing it.`,
+      detail: "No new sale or order can use it, and its name can be used for a new channel.",
       title: "Delete this sales channel?",
     });
 
