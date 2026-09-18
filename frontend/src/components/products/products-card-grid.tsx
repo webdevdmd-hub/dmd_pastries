@@ -22,7 +22,6 @@ import { getProductImageUrl } from "@/lib/storage/files";
  * the click so it does not also open the drawer.
  */
 export function ProductsCardGrid({
-  canManage,
   inventoryAvailable,
   inventoryByProduct,
   onDelete,
@@ -30,6 +29,7 @@ export function ProductsCardGrid({
   onManageVariants,
   onStatusChange,
   onView,
+  permissions,
   products,
 }: ProductsListProps): JSX.Element {
   return (
@@ -76,7 +76,7 @@ export function ProductsCardGrid({
               >
                 <ProductStatusBadge status={product.status} />
                 <ProductActionsMenu
-                  canManage={canManage}
+                  permissions={permissions}
                   onDelete={onDelete}
                   onEdit={onEdit}
                   onManageVariants={onManageVariants}

@@ -12,32 +12,38 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { type ProductPermissions, productRowActions } from "@/lib/products/product-actions";
 import type { Product, ProductStatus } from "@/types/product";
 
 type ProductActionsMenuProps = {
-  canManage: boolean;
   onDelete: (product: Product) => void;
   onEdit: (product: Product) => void;
   onManageVariants: (product: Product) => void;
   onStatusChange: (product: Product, status: ProductStatus) => void;
+  permissions: ProductPermissions;
   product: Product;
 };
 
 /**
  * Actions only. Viewing is the row's own click, so "View details" no longer
- * sits here; a reader with no manage rights sees no menu at all.
+ * sits here; a reader with no product rights sees no menu at all, and each
+ * item shows only for the permission its route checks (ISSUE-065).
  */
 export function ProductActionsMenu({
-  canManage,
   onDelete,
   onEdit,
   onManageVariants,
   onStatusChange,
+  permissions,
   product,
 }: ProductActionsMenuProps): JSX.Element | null {
   const nextStatus: ProductStatus = product.status === "active" ? "inactive" : "active";
+  const actions = productRowActions(permissions, product.status);
+  const offers = (action: (typeof actions)[number]): boolean => actions.includes(action);
+  const hasEditGroup = offers("edit") || offers("variants") || offers("status");
+  const hasRemoveGroup = offers("archive") || offers("delete");
 
-  if (!canManage) {
+  if (actions.length === 0) {
     return null;
   }
 
@@ -54,34 +60,44 @@ export function ProductActionsMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuGroup>
-          <DropdownMenuItem onSelect={() => onEdit(product)}>
-            <Pencil className="h-4 w-4" />
-            Edit product
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => onManageVariants(product)}>
-            <PackageSearch className="h-4 w-4" />
-            Manage variants
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => onStatusChange(product, nextStatus)}>
-            <Power className="h-4 w-4" />
-            {nextStatus === "active" ? "Activate" : "Deactivate"} product
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        {product.status !== "archived" ? (
+        {hasEditGroup ? (
+          <DropdownMenuGroup>
+            {offers("edit") ? (
+              <DropdownMenuItem onSelect={() => onEdit(product)}>
+                <Pencil className="h-4 w-4" />
+                Edit product
+              </DropdownMenuItem>
+            ) : null}
+            {offers("variants") ? (
+              <DropdownMenuItem onSelect={() => onManageVariants(product)}>
+                <PackageSearch className="h-4 w-4" />
+                Manage variants
+              </DropdownMenuItem>
+            ) : null}
+            {offers("status") ? (
+              <DropdownMenuItem onSelect={() => onStatusChange(product, nextStatus)}>
+                <Power className="h-4 w-4" />
+                {nextStatus === "active" ? "Activate" : "Deactivate"} product
+              </DropdownMenuItem>
+            ) : null}
+          </DropdownMenuGroup>
+        ) : null}
+        {hasEditGroup && hasRemoveGroup ? <DropdownMenuSeparator /> : null}
+        {offers("archive") ? (
           <DropdownMenuItem onSelect={() => onStatusChange(product, "archived")}>
             <Archive className="h-4 w-4" />
             Archive product
           </DropdownMenuItem>
         ) : null}
-        <DropdownMenuItem
-          className="text-danger-text focus:text-danger-text"
-          onSelect={() => onDelete(product)}
-        >
-          <Trash2 className="h-4 w-4" />
-          Delete product
-        </DropdownMenuItem>
+        {offers("delete") ? (
+          <DropdownMenuItem
+            className="text-danger-text focus:text-danger-text"
+            onSelect={() => onDelete(product)}
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete product
+          </DropdownMenuItem>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

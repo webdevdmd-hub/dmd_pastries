@@ -20,7 +20,8 @@ import { ROUTES } from "@/constants/routes";
 import type { Product, ProductVariant } from "@/types/product";
 
 type ProductDetailsDrawerProps = {
-  canManage: boolean;
+  canEdit: boolean;
+  canManageVariants: boolean;
   /** The tab the sheet opens on; "Manage variants" lands on Variants. */
   initialTab: ProductDetailTabKey;
   onAddVariant: () => void;
@@ -42,7 +43,8 @@ type ProductDetailsDrawerProps = {
  * URL to share.
  */
 export function ProductDetailsDrawer({
-  canManage,
+  canEdit,
+  canManageVariants,
   initialTab,
   onAddVariant,
   onDeleteVariant,
@@ -69,7 +71,8 @@ export function ProductDetailsDrawer({
           // Keyed by product and opening tab so switching products, or
           // re-opening on Variants from the kebab, resets the strip.
           <ProductDetailsDrawerBody
-            canManage={canManage}
+            canEdit={canEdit}
+            canManageVariants={canManageVariants}
             initialTab={initialTab}
             key={`${product.id}:${initialTab}`}
             onAddVariant={onAddVariant}
@@ -88,7 +91,8 @@ export function ProductDetailsDrawer({
 }
 
 function ProductDetailsDrawerBody({
-  canManage,
+  canEdit,
+  canManageVariants,
   initialTab,
   onAddVariant,
   onDeleteVariant,
@@ -97,7 +101,8 @@ function ProductDetailsDrawerBody({
   product,
   variants,
 }: {
-  canManage: boolean;
+  canEdit: boolean;
+  canManageVariants: boolean;
   initialTab: ProductDetailTabKey;
   onAddVariant: () => void;
   onDeleteVariant: (variant: ProductVariant) => void;
@@ -127,7 +132,7 @@ function ProductDetailsDrawerBody({
               Open full page
             </Link>
           </Button>
-          {canManage && onEdit ? (
+          {canEdit && onEdit ? (
             <Button onClick={() => onEdit(product)} size="sm" type="button" variant="outline">
               <Pencil className="h-4 w-4" />
               Edit product
@@ -138,7 +143,7 @@ function ProductDetailsDrawerBody({
 
       <ProductDetailsPanel
         activeTab={activeTab}
-        canManage={canManage}
+        canManageVariants={canManageVariants}
         onAddVariant={onAddVariant}
         onDeleteVariant={onDeleteVariant}
         onEditVariant={onEditVariant}

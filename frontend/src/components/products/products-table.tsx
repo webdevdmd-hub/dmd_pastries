@@ -14,6 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type { ProductPermissions } from "@/lib/products/product-actions";
 import { isPosSelectableProduct } from "@/lib/selectors/eligibility";
 import { getProductImageUrl } from "@/lib/storage/files";
 import type { Product, ProductStatus } from "@/types/product";
@@ -25,7 +26,6 @@ export type ProductInventorySummary = {
 };
 
 export type ProductsListProps = {
-  canManage: boolean;
   inventoryAvailable: boolean;
   inventoryByProduct: ReadonlyMap<string, ProductInventorySummary>;
   onDelete: (product: Product) => void;
@@ -34,6 +34,7 @@ export type ProductsListProps = {
   onStatusChange: (product: Product, status: ProductStatus) => void;
   /** Opens the product's details; the whole row is the target. */
   onView: (product: Product) => void;
+  permissions: ProductPermissions;
   products: Product[];
 };
 
@@ -124,7 +125,6 @@ export function ProductAvailability({ product }: { product: Product }): JSX.Elem
 }
 
 export function ProductsTable({
-  canManage,
   inventoryAvailable,
   inventoryByProduct,
   onDelete,
@@ -132,6 +132,7 @@ export function ProductsTable({
   onManageVariants,
   onStatusChange,
   onView,
+  permissions,
   products,
 }: ProductsListProps): JSX.Element {
   return (
@@ -226,7 +227,7 @@ export function ProductsTable({
               {/* The menu must not also open the drawer. */}
               <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
                 <ProductActionsMenu
-                  canManage={canManage}
+                  permissions={permissions}
                   onDelete={onDelete}
                   onEdit={onEdit}
                   onManageVariants={onManageVariants}
