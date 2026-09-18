@@ -1,9 +1,11 @@
 package users
 
 import (
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 
 	"pastries-pos/internal/shared/utils"
@@ -168,6 +170,42 @@ func (r *Repository) SoftDeleteByBusinessID(tx *gorm.DB, userID, businessID stri
 		return apperrors.NotFound("user not found")
 	}
 	return nil
+}
+
+// HardDeleteByBusinessID erases a user who left no history. It runs inside a
+// savepoint and reports erased=false (never an error) when a foreign key the
+// history list does not know about still points at the user, so the caller
+// can fall back to keeping the record instead of failing the delete.
+func (r *Repository) HardDeleteByBusinessID(tx *gorm.DB, userID, businessID string) (bool, error) {
+	if err := tx.SavePoint("erase_user").Error; err != nil {
+		return false, err
+	}
+	if err := tx.Exec("DELETE FROM user_branch_access WHERE business_id = ? AND user_id = ?", businessID, userID).Error; err != nil {
+		return false, tx.RollbackTo("erase_user").Error
+	}
+	result := tx.Exec("DELETE FROM users WHERE id = ? AND business_id = ?", userID, businessID)
+	if result.Error != nil {
+		if isForeignKeyViolation(result.Error) {
+			return false, tx.RollbackTo("erase_user").Error
+		}
+		return false, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return false, apperrors.NotFound("user not found")
+	}
+	return true, nil
+}
+
+// ClearProviderIDs unlinks a kept (soft-deleted) user from logins that no
+// longer exist, so nothing can later try to wake or restore them.
+func (r *Repository) ClearProviderIDs(tx *gorm.DB, userID string) error {
+	return tx.Unscoped().Model(&User{}).Where("id = ?", userID).
+		Updates(map[string]interface{}{"appwrite_user_id": nil, "supabase_user_id": nil}).Error
+}
+
+func isForeignKeyViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23503"
 }
 
 func (r *Repository) RestoreByBusinessID(tx *gorm.DB, userID, businessID string) error {

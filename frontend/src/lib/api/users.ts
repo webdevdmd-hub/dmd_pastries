@@ -70,6 +70,7 @@ type BackendSoftDeleteUserResult = {
   id?: string;
   status?: string;
   deleted_at?: string;
+  erased?: boolean;
 };
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -195,6 +196,7 @@ function parseSoftDeleteUserResult(value: unknown): SoftDeleteUserResult {
     id,
     status: "deleted",
     deletedAt,
+    erased: result.erased === true,
   };
 }
 

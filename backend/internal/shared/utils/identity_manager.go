@@ -3,6 +3,7 @@ package utils
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 )
 
@@ -23,6 +24,12 @@ func (ids ProviderIDs) AppwriteOrNil() *string {
 	}
 	value := ids.Appwrite
 	return &value
+}
+
+// HasLogin reports whether the user still has an account in any provider.
+// Staff deleted since ISSUE-075 have none: their login was removed.
+func (ids ProviderIDs) HasLogin() bool {
+	return strings.TrimSpace(ids.Appwrite) != "" || strings.TrimSpace(ids.Supabase) != ""
 }
 
 func (ids ProviderIDs) SupabaseOrNil() *string {
@@ -161,7 +168,9 @@ func (m *IdentityManager) DeleteUser(ids ProviderIDs) error {
 		}
 	}
 	if ids.Supabase != "" && m.supabaseLive() {
-		if err := m.supabase.DeleteUser(ids.Supabase); err != nil {
+		// Already gone counts as deleted: a staff delete that removed the login
+		// and then failed to commit must succeed when it is retried (ISSUE-075).
+		if err := m.supabase.DeleteUser(ids.Supabase); err != nil && !isSupabaseNotFound(err) {
 			failures = append(failures, "supabase: "+err.Error())
 		}
 	}
@@ -170,6 +179,11 @@ func (m *IdentityManager) DeleteUser(ids ProviderIDs) error {
 		return fmt.Errorf("failed to delete identity: %s", strings.Join(failures, "; "))
 	}
 	return nil
+}
+
+func isSupabaseNotFound(err error) bool {
+	var apiErr *SupabaseAPIError
+	return errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound
 }
 
 // SetUserStatus blocks or restores sign-in everywhere.

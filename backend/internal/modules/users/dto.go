@@ -112,6 +112,9 @@ type DeleteUserResponse struct {
 	ID        string     `json:"id"`
 	Status    string     `json:"status"`
 	DeletedAt *time.Time `json:"deleted_at"`
+	// Erased is true when the staff record was removed too, not just hidden:
+	// the person left no history the business must keep (ISSUE-075).
+	Erased bool `json:"erased"`
 }
 
 type AssignBranchRequest struct {
