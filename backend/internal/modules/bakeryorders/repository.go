@@ -246,6 +246,23 @@ func (r *Repository) MarkMovementReversed(tx *gorm.DB, businessID, movementID, r
 		Updates(map[string]interface{}{"is_reversed": true, "reversed_by_movement_id": reversalMovementID}).Error
 }
 
+// LedgerHistory counts the stock movements and the order-keyed journals
+// (revenue, COGS and their reversals) that point at an order. Payment
+// journals are keyed to the payment and covered by CountOrderPayments.
+func (r *Repository) LedgerHistory(tx *gorm.DB, businessID, orderID string) (bakeryOrderLedgerHistory, error) {
+	var history bakeryOrderLedgerHistory
+	if err := tx.Table("stock_movements").
+		Where("business_id = ? AND reference_id = ? AND reference_type IN ?", businessID, orderID, []string{"bakery_order", "bakery_order_cancelled"}).
+		Count(&history.StockMovements).Error; err != nil {
+		return history, err
+	}
+	err := tx.Table("journal_entries").
+		Where("business_id = ? AND source_id = ? AND source_type IN ? AND deleted_at IS NULL", businessID, orderID,
+			[]string{"bakery_order_revenue", "bakery_order_revenue_reversal", "bakery_order_cogs", "bakery_order_cogs_reversal"}).
+		Count(&history.Journals).Error
+	return history, err
+}
+
 func (r *Repository) CountOrderPayments(tx *gorm.DB, businessID, orderID string) (int64, error) {
 	var count int64
 	err := tx.Table("bakery_order_payments").
