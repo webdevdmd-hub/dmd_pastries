@@ -59,3 +59,18 @@ Report: `.gstack/qa-reports/qa-report-app-dmdpastries-com-2026-09-18.md`. Produc
 | T-X | `dashboard.isAdminVisible` grants the admin dashboard to role names "admin"/"owner", against c83afb8 ("role names decide nothing"). | Out of the RBAC run's live-proven scope. | S → S | P2 | — |
 | T-Y | `components/dashboard/dashboard-page-shell.tsx` has no callers (it also loads the activity feed ungated). Delete it. | Dead code. | S → S | P3 | — |
 | T-Z | `pos-discount-control.tsx` label is uppercase with wide tracking at 0.62rem, against DESIGN.md (no uppercase in-app, nothing below 12px); ESLint `design/*` warns. | Pre-existing, visual. | S → S | P3 | — |
+
+## Deferred from the delete audit (2026-09-18)
+
+Report: `.gstack/qa-reports/delete-audit-2026-09-18.md`. Issues 075-097 were fixed in one pass. These items are left over.
+
+| # | What | Why deferred | Effort (human → CC) | Priority | Blocked by |
+| --- | --- | --- | --- | --- | --- |
+| T-AA | **Storage files are never deleted.** No delete path removes the uploaded object: product, variant, category, ingredient and packaging images, expense receipts and the company logo. Replacing an image orphans the old one. `CopyCategories` copies file references across branches, so cleanup needs reference counting. | Owner: own spec (D2). | M → M | P2 | spec |
+| T-AB | **Two no-database test helpers do the same job:** `internal/testsupport/dryrundb` and `internal/testsupport/fakesql`, built in parallel. Merge them into one, and move the tests that use the other. | Came out of parallel fix agents; both work. | S → S | P3 | — |
+| T-AC | `manufacturing/repository_tx_test.go` (`TestIngredientsReadsThroughCallerTransaction`, `TestPackagingAndOutputReadThroughCallerTransaction`) fails on its own setup insert (FK to a batch it never created). Broken on main before this work; skips without a database. | Pre-existing test bug. | S → S | P2 | — |
+| T-AD | **Product code/SKU/barcode uniqueness may be business-wide in the live DB.** The 000010 indexes are never dropped; the app checks per branch, so a cross-branch duplicate would 500 at insert. Check the live indexes, then align (the bakery-orders product-code generator still numbers per branch). | Needs a live-DB read. | S → S | P2 | — |
+| T-AE | Ingredient/packaging category names are unique per business (index 000005), so two branches cannot both have "Dairy". Now a friendly 409 (ISSUE-089); changing to per-branch needs a migration. | Product decision. | S → S | P3 | owner |
+| T-AF | Editing an ingredient or packaging item whose unit or category is inactive still returns 404 on save. Lookups still return inactive order and payment statuses. | Adjacent to ISSUE-089, out of its scope. | S → S | P3 | — |
+| T-AG | Supplier delete ignores expenses that name the supplier, and editing such an expense later fails with 404. Deactivating a supplier also blocks ingredient and packaging saves that still reference it. | Adjacent to ISSUE-088. | S → S | P3 | — |
+| T-AH | `pos.void` exists in the permission matrix but no screen offers Void; voids are API-only. | Feature, not a delete bug. | S → S | P3 | — |
