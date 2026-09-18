@@ -996,7 +996,7 @@ export function ExpensesPageClient({
 
     try {
       await deleteMutation.mutateAsync(deleteTarget.id);
-      toast.success("Expense permanently deleted.");
+      toast.success("Expense deleted.");
       setDeleteTarget(null);
     } catch (error) {
       toast.error(getErrorMessage(error));
@@ -1126,11 +1126,15 @@ export function ExpensesPageClient({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete expense permanently?</DialogTitle>
+            <DialogTitle>Delete expense?</DialogTitle>
+            {/* The server soft-deletes the expense and its journals: they leave
+                the list and the books, the rows are kept, and the delete is
+                written to the audit log with the number, amount and journal
+                ids. Nothing is destroyed, so the copy must not say it is. */}
             <DialogDescription>
               {deleteTarget
-                ? `This permanently deletes ${deleteTarget.expenseNumber}, ${formatExpenseAmount(deleteTarget.amount)} of ${deleteTarget.expenseAccountName}, and removes its journal entries from the ledger. It cannot be undone.`
-                : "This permanently deletes the expense and its journal entries. It cannot be undone."}
+                ? `This removes ${deleteTarget.expenseNumber}, ${formatExpenseAmount(deleteTarget.amount)} of ${deleteTarget.expenseAccountName}, and takes its journal entries out of the ledger. The delete is kept in the audit log; the expense cannot be restored from here.`
+                : "This removes the expense and takes its journal entries out of the ledger. The delete is kept in the audit log; the expense cannot be restored from here."}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -1144,7 +1148,7 @@ export function ExpensesPageClient({
               type="button"
               variant="outline"
             >
-              Delete permanently
+              Delete expense
             </Button>
           </DialogFooter>
         </DialogContent>
