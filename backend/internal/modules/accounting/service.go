@@ -1068,6 +1068,13 @@ func (s *Service) DeletePaymentAccount(currentUser *utils.AuthContext, id, ipAdd
 		if count > 0 {
 			return apperrors.Conflict("payment account is linked to payment methods; unlink it before deleting", nil)
 		}
+		branchCount, err := s.repo.CountBranchPaymentMethodsUsingPaymentAccount(tx, currentUser.BusinessID, id)
+		if err != nil {
+			return apperrors.Internal("failed to validate payment method links")
+		}
+		if branchCount > 0 {
+			return apperrors.Conflict("payment account is a payment method's account for a branch; it cannot be deleted while that branch still takes payments into it", nil)
+		}
 		// Without this the account's opening entry would strand a balance in
 		// 3400 Opening Balance Equity for an account that no longer exists.
 		if err := s.clearPaymentAccountOpeningJournal(tx, currentUser, account); err != nil {

@@ -2428,6 +2428,18 @@ func (r *Repository) CountPaymentMethodsUsingPaymentAccount(tx *gorm.DB, busines
 	return count, err
 }
 
+// CountBranchPaymentMethodsUsingPaymentAccount counts branch overrides that
+// route a payment method to this account. Checkout resolves the override
+// before the method's default, so a deleted account behind one leaves that
+// branch's till with nowhere to post the method. (ISSUE-079)
+func (r *Repository) CountBranchPaymentMethodsUsingPaymentAccount(tx *gorm.DB, businessID, id string) (int64, error) {
+	var count int64
+	err := tx.Table("payment_method_account_mappings").
+		Where("business_id = ? AND payment_account_id = ? AND deleted_at IS NULL", businessID, id).
+		Count(&count).Error
+	return count, err
+}
+
 func (r *Repository) ValidateActiveAssetChartAccount(tx *gorm.DB, businessID, branchID, accountID string) (*ChartAccount, error) {
 	var account ChartAccount
 	err := tx.Where("business_id = ? AND branch_id = ? AND id = ? AND account_type = ? AND status = ? AND deleted_at IS NULL", businessID, branchID, accountID, "asset", "active").First(&account).Error
