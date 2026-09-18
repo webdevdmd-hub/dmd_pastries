@@ -68,6 +68,7 @@ import {
   getHistoryDeleteConflictMessage,
   isHistoryDeleteConflict,
 } from "@/lib/api/delete-conflicts";
+import { productDeleteConfirmation } from "@/lib/catalog/delete-confirmations";
 import type { InventoryFilters } from "@/types/inventory";
 import type {
   CreateProductPayload,
@@ -209,6 +210,10 @@ export function ProductsPageClient(): JSX.Element {
     nextStatus?: ProductStatus;
     product: Product;
   } | null>(null);
+  const deleteCopy =
+    confirmState?.action === "delete"
+      ? productDeleteConfirmation(confirmState.product.productName)
+      : null;
   const [selectedSuggestionIds, setSelectedSuggestionIds] = useState<string[]>([]);
   const [suggestionPrices, setSuggestionPrices] = useState<Record<string, string>>({});
 
@@ -767,22 +772,25 @@ export function ProductsPageClient(): JSX.Element {
         <DialogContent>
           <DialogHeader>
             {/* One dialog covered deleting a product and changing its status,
-                and said nothing about either beyond the name. Deleting is not
-                what it sounds like -- the product is archived and pulled from
-                sale and from the register -- and a product carrying any sales,
-                orders or stock history cannot be deleted at all. None of that
-                reached the person about to click Delete.
+                and said nothing about either beyond the name. A product
+                carrying any sales, orders or stock history cannot be deleted
+                at all. None of that reached the person about to click Delete.
 
                 Regression: ISSUE-009 — the product delete confirmation named no consequence
-                Found by /qa on 2026-09-14 */}
+                Found by /qa on 2026-09-14
+
+                The fix for that then said the deleted product "is archived".
+                It is soft-deleted: it never shows under the Archived filter and
+                cannot be restored, so the words now come from
+                productDeleteConfirmation (ISSUE-086). */}
             <DialogTitle>
-              {confirmState?.action === "delete"
-                ? `Delete ${confirmState.product.productName}?`
+              {deleteCopy
+                ? deleteCopy.title
                 : `Change status for ${confirmState?.product.productName ?? "this product"}?`}
             </DialogTitle>
             <DialogDescription>
-              {confirmState?.action === "delete"
-                ? "The product is archived and removed from sale and from the register. A product with sales, orders or stock history cannot be deleted at all; deactivate it instead."
+              {deleteCopy
+                ? deleteCopy.consequence
                 : confirmState?.nextStatus
                   ? productStatusChangeMessage(confirmState.nextStatus)
                   : "Confirm the selected product action."}
@@ -790,7 +798,7 @@ export function ProductsPageClient(): JSX.Element {
           </DialogHeader>
           <DialogFooter>
             <Button onClick={() => setConfirmState(null)} type="button" variant="outline">
-              Cancel
+              {deleteCopy ? deleteCopy.cancelLabel : "Cancel"}
             </Button>
             <Button
               onClick={() => {
@@ -839,7 +847,7 @@ export function ProductsPageClient(): JSX.Element {
               type="button"
               variant={confirmState?.action === "delete" ? "outline" : "default"}
             >
-              {confirmState?.action === "delete" ? "Delete" : "Confirm"}
+              {deleteCopy ? deleteCopy.confirmLabel : "Confirm"}
             </Button>
           </DialogFooter>
         </DialogContent>

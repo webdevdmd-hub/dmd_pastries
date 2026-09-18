@@ -29,6 +29,21 @@ export function ingredientDeleteConfirmation(name: string): DeleteConfirmation {
 }
 
 /**
+ * The product dialog said the product "is archived". It is not: it is
+ * soft-deleted, never shows under the Archived filter and cannot be restored
+ * (ISSUE-086). Archiving is the separate Archive action, and it is what a
+ * product with history needs instead.
+ */
+export function productDeleteConfirmation(name: string): DeleteConfirmation {
+  return {
+    title: `Delete ${name}?`,
+    consequence: `${name} and its variants are removed from the catalogue and the till, and cannot be restored. A product with sales, orders, stock, recipes or purchases cannot be deleted; archive it instead, which retires it and keeps its history.`,
+    confirmLabel: "Delete product",
+    cancelLabel: "Keep product",
+  };
+}
+
+/**
  * A variant was deleted on one click, with no question asked, while its
  * inventory row stayed behind and sales, orders and recipes that named it
  * showed a blank variant (ISSUE-084). The server now refuses a used variant

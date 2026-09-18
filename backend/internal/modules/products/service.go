@@ -346,7 +346,7 @@ func (s *Service) DeleteProduct(currentUser *utils.AuthContext, id string, ipAdd
 		return apperrors.Internal("failed to validate product history")
 	}
 	if len(references) > 0 {
-		return apperrors.Conflict("Product has transaction history and cannot be deleted. Deactivate it instead.", map[string]interface{}{
+		return apperrors.Conflict("Product has transaction history and cannot be deleted. Archive it instead to retire it and keep its history.", map[string]interface{}{
 			"reason":     "product_has_history",
 			"references": references,
 		})
@@ -365,7 +365,12 @@ func (s *Service) DeleteProduct(currentUser *utils.AuthContext, id string, ipAdd
 		"branch_id":    product.BranchID,
 		"status":       "archived",
 	}, productChanges(*product, updates)), func(tx *gorm.DB) error {
-		return s.repo.Update(tx, id, currentUser.BusinessID, branchID, updates)
+		if err := s.repo.Update(tx, id, currentUser.BusinessID, branchID, updates); err != nil {
+			return err
+		}
+		// The variants go with the product (ISSUE-086); the history check
+		// above already covered theirs.
+		return s.repo.RetireVariants(tx, currentUser.BusinessID, id)
 	})
 }
 
