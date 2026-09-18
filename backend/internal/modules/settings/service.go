@@ -2,6 +2,7 @@ package settings
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -897,6 +898,11 @@ func (s *Service) UpdateTaxRateStatus(currentUser *utils.AuthContext, id string,
 		}
 		return nil, apperrors.Internal("failed to fetch tax rate")
 	}
+	if req.Status == "inactive" {
+		if err := s.ensureTaxRateUnused(currentUser.BusinessID, id); err != nil {
+			return nil, err
+		}
+	}
 	tx := s.db.Begin()
 	if tx.Error != nil {
 		return nil, apperrors.Internal("failed to start transaction")
@@ -937,6 +943,9 @@ func (s *Service) DeleteTaxRate(currentUser *utils.AuthContext, id string, ipAdd
 			return apperrors.NotFound("tax rate not found")
 		}
 		return apperrors.Internal("failed to fetch tax rate")
+	}
+	if err := s.ensureTaxRateUnused(currentUser.BusinessID, id); err != nil {
+		return err
 	}
 	tx := s.db.Begin()
 	if tx.Error != nil {
@@ -1411,6 +1420,26 @@ func paymentMethodChanges(existing PaymentMethod, updates map[string]interface{}
 		}
 	}
 	return changes
+}
+
+// ensureTaxRateUnused refuses to take a rate out of service while products
+// still carry it. The till only joins a product's rate while that rate is
+// active (pos/repository.go), so those products would ring up with no tax
+// at all. This covers the default rate too: nothing assigns the default to
+// a product implicitly, so the products that carry it are all there is to
+// protect. (ISSUE-078)
+func (s *Service) ensureTaxRateUnused(businessID, taxRateID string) error {
+	count, err := s.repo.CountProductsUsingTaxRate(businessID, taxRateID)
+	if err != nil {
+		return apperrors.Internal("failed to validate tax rate usage")
+	}
+	if count == 0 {
+		return nil
+	}
+	if count == 1 {
+		return apperrors.Conflict("1 product still uses this tax rate; move it to another tax rate before deactivating this one", nil)
+	}
+	return apperrors.Conflict(fmt.Sprintf("%d products still use this tax rate; move them to another tax rate before deactivating this one", count), nil)
 }
 
 func validateTaxType(taxType string) error {
