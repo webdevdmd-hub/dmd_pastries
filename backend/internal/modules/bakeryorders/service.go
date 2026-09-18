@@ -162,9 +162,15 @@ func (s *Service) UpdateOrder(currentUser *utils.AuthContext, id string, req Upd
 		updates := map[string]interface{}{"updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}
 		if req.CustomerID != nil {
 			customerID := strings.TrimSpace(*req.CustomerID)
-			if customerID == "" {
+			switch {
+			case customerID == "":
 				updates["customer_id"] = nil
-			} else {
+			case order.CustomerID != nil && *order.CustomerID == customerID:
+				// The form resubmits the order's own customer on every save.
+				// It is not a new choice, so it need not be active: a customer
+				// with orders is retired by deactivating (ISSUE-087), and
+				// re-validating made every one of their orders uneditable.
+			default:
 				customer, err := s.validCustomer(tx, currentUser.BusinessID, order.BranchID, customerID)
 				if err != nil {
 					return err
