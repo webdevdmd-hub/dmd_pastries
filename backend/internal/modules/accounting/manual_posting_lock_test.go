@@ -10,9 +10,8 @@ import (
 
 // Regression: ISSUE-039 — accounts meant to be locked against manual posting never were.
 //
-// ChartAccount.AllowManualPosting carries gorm:"default:true". A plain Create
-// treats a false bool as unset and leaves it out of the INSERT, so the column
-// default TRUE won. No seeded account was ever locked, and neither was an
+// ChartAccount.AllowManualPosting carried gorm:"default:true", and GORM writes a
+// tag default in place of false, so the column was always TRUE. No seeded account was ever locked, and neither was an
 // account created in the UI with "Allow manual posting" unchecked. On
 // production on 2026-09-16 the expense form offered 5000 Opening Stock, 5070
 // Cost of Goods Sold and 1030 Card Clearing.
@@ -25,18 +24,10 @@ import (
 
 var ownerApprovedLocks = []string{"1030", "5000", "5010", "5020", "5050", "5070", "5080", "5090"}
 
-// The inserts must carry false. Checked on both paths that create accounts.
-func TestChartAccountCreatesPersistALockedFlag(t *testing.T) {
-	repository := readAccountingSource(t, "repository.go")
-	if !regexp.MustCompile(`func \(r \*Repository\) Create\(tx \*gorm\.DB, account \*ChartAccount\) error \{\s*return tx\.Select\("\*"\)\.Create\(account\)`).MatchString(repository) {
-		t.Error("Repository.Create must use Select(\"*\"): without it an account created with manual posting " +
-			"unchecked is saved as allowing it")
-	}
-	seeder := readAccountingSource(t, "seeder.go")
-	if !strings.Contains(seeder, `tx.Select("*").Create(&account)`) {
-		t.Error("SeedDefaultChartOfAccounts must use Select(\"*\"), or every seeded lock is lost to the column default")
-	}
-}
+// That the INSERT carries false is checked in
+// settings/create_insert_values_test.go (ISSUE-063): the first fix here added
+// Select("*"), which GORM ignores for tag defaults, and a test that only read
+// the source for it passed.
 
 // New businesses get exactly the owner's locks -- the same accounts the
 // migration locks on existing ones -- so the two never behave differently.

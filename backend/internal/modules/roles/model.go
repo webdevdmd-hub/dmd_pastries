@@ -21,11 +21,14 @@ func (Role) TableName() string {
 	return "roles"
 }
 
+// RolePermission has no gorm default on Allowed: GORM writes a tag default in place of
+// false, so an "off" choice was saved "on". The column defaults live in the
+// migrations. (ISSUE-063)
 type RolePermission struct {
 	ID           string    `gorm:"type:uuid;primaryKey" json:"id"`
 	RoleID       string    `gorm:"type:uuid;not null;index" json:"role_id"`
 	PermissionID string    `gorm:"type:uuid;not null;index" json:"permission_id"`
-	Allowed      bool      `gorm:"not null;default:true" json:"allowed"`
+	Allowed      bool      `gorm:"not null" json:"allowed"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }

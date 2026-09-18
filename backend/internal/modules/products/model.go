@@ -6,6 +6,9 @@ import (
 	"gorm.io/gorm"
 )
 
+// Product has no gorm default on IsPOSVisible: GORM writes a tag default in place of
+// false, so an "off" choice was saved "on". The column defaults live in the
+// migrations. (ISSUE-063)
 type Product struct {
 	ID                     string         `gorm:"type:uuid;primaryKey" json:"id"`
 	BusinessID             string         `gorm:"type:uuid;not null;index" json:"business_id"`
@@ -38,7 +41,7 @@ type Product struct {
 	ImageFileID            string         `gorm:"size:500" json:"image_file_id"`
 	ImageStoragePath       string         `gorm:"size:500" json:"image_storage_path"`
 	IsSellable             bool           `gorm:"not null;default:false" json:"is_sellable"`
-	IsPOSVisible           bool           `gorm:"not null;default:true" json:"is_pos_visible"`
+	IsPOSVisible           bool           `gorm:"not null" json:"is_pos_visible"`
 	IsPurchasable          bool           `gorm:"not null;default:false" json:"is_purchasable"`
 	IsStockTracked         bool           `gorm:"not null;default:false" json:"is_stock_tracked"`
 	IsExpiryTracked        bool           `gorm:"not null;default:false" json:"is_expiry_tracked"`

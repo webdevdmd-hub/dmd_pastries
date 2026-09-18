@@ -7,6 +7,9 @@ import (
 	"gorm.io/gorm"
 )
 
+// Ingredient has no gorm default on IsStockTracked or IsExpiryTracked: GORM writes a tag default in place of
+// false, so an "off" choice was saved "on". The column defaults live in the
+// migrations. (ISSUE-063)
 type Ingredient struct {
 	ID                   string         `gorm:"type:uuid;primaryKey" json:"id"`
 	BusinessID           string         `gorm:"type:uuid;not null;index" json:"business_id"`
@@ -18,8 +21,8 @@ type Ingredient struct {
 	Description          string         `json:"description"`
 	UnitID               string         `gorm:"type:uuid;not null;index" json:"unit_id"`
 	CostPerUnit          money.Amount   `gorm:"not null;default:0" json:"cost_per_unit"`
-	IsStockTracked       bool           `gorm:"not null;default:true" json:"is_stock_tracked"`
-	IsExpiryTracked      bool           `gorm:"not null;default:true" json:"is_expiry_tracked"`
+	IsStockTracked       bool           `gorm:"not null" json:"is_stock_tracked"`
+	IsExpiryTracked      bool           `gorm:"not null" json:"is_expiry_tracked"`
 	ReorderLevel         money.Amount   `gorm:"not null;default:0" json:"reorder_level"`
 	ImageURL             *string        `gorm:"size:500" json:"image_url"`
 	ImageFileID          string         `gorm:"size:500" json:"image_file_id"`

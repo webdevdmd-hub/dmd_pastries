@@ -145,7 +145,10 @@ func (s *Service) CreateUnit(currentUser *utils.AuthContext, req CreateUnitReque
 	if factor <= 0 {
 		return nil, apperrors.BadRequest("conversion_factor must be positive", nil)
 	}
-	precision := req.DecimalPrecision
+	precision := 2
+	if req.DecimalPrecision != nil {
+		precision = *req.DecimalPrecision
+	}
 	if precision < 0 {
 		return nil, apperrors.BadRequest("decimal_precision cannot be negative", nil)
 	}

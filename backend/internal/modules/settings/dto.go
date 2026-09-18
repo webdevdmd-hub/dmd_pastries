@@ -88,11 +88,13 @@ type TaxRateResponse struct {
 	UpdatedAt      time.Time `json:"updated_at"`
 }
 
+// CreatePaymentMethodRequest: an omitted AllowSplitPayment means on, as the column
+// default. (ISSUE-063)
 type CreatePaymentMethodRequest struct {
 	MethodName                string  `json:"method_name" binding:"required"`
 	MethodType                string  `json:"method_type" binding:"required"`
 	IsDefault                 bool    `json:"is_default"`
-	AllowSplitPayment         bool    `json:"allow_split_payment"`
+	AllowSplitPayment         *bool   `json:"allow_split_payment"`
 	RequiresReference         bool    `json:"requires_reference"`
 	ShowInPOS                 *bool   `json:"show_in_pos"`
 	ShowInBakeryOrders        *bool   `json:"show_in_bakery_orders"`

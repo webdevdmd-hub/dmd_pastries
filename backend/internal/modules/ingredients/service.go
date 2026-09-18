@@ -97,8 +97,8 @@ func (s *Service) Create(currentUser *utils.AuthContext, req CreateIngredientReq
 			Description:          strings.TrimSpace(req.Description),
 			UnitID:               strings.TrimSpace(req.UnitID),
 			CostPerUnit:          req.CostPerUnit,
-			IsStockTracked:       req.IsStockTracked,
-			IsExpiryTracked:      req.IsExpiryTracked,
+			IsStockTracked:       boolOrTrue(req.IsStockTracked),
+			IsExpiryTracked:      boolOrTrue(req.IsExpiryTracked),
 			ReorderLevel:         req.ReorderLevel,
 			ImageURL:             nullableString(req.ImageURL),
 			ImageFileID:          strings.TrimSpace(req.ImageFileID),
@@ -413,4 +413,9 @@ func notFound(err error, message string) error {
 		return apperrors.NotFound(message)
 	}
 	return err
+}
+
+// boolOrTrue reads an optional create flag whose column defaults to true.
+func boolOrTrue(value *bool) bool {
+	return value == nil || *value
 }

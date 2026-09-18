@@ -7,6 +7,9 @@ import (
 	"gorm.io/gorm"
 )
 
+// PackagingItem has no gorm default on IsStockTracked or IsConsumable: GORM writes a tag default in place of
+// false, so an "off" choice was saved "on". The column defaults live in the
+// migrations. (ISSUE-063)
 type PackagingItem struct {
 	ID                  string         `gorm:"type:uuid;primaryKey" json:"id"`
 	BusinessID          string         `gorm:"type:uuid;not null;index" json:"business_id"`
@@ -18,8 +21,8 @@ type PackagingItem struct {
 	Description         string         `json:"description"`
 	UnitID              string         `gorm:"type:uuid;not null;index" json:"unit_id"`
 	CostPerUnit         money.Amount   `gorm:"not null;default:0" json:"cost_per_unit"`
-	IsStockTracked      bool           `gorm:"not null;default:true" json:"is_stock_tracked"`
-	IsConsumable        bool           `gorm:"not null;default:true" json:"is_consumable"`
+	IsStockTracked      bool           `gorm:"not null" json:"is_stock_tracked"`
+	IsConsumable        bool           `gorm:"not null" json:"is_consumable"`
 	ReorderLevel        money.Amount   `gorm:"not null;default:0" json:"reorder_level"`
 	ImageURL            *string        `gorm:"size:500" json:"image_url"`
 	ImageFileID         string         `gorm:"size:500" json:"image_file_id"`

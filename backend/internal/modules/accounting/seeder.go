@@ -28,10 +28,11 @@ type defaultAccountSeed struct {
 
 // Manual posting locks (ISSUE-039, owner decision 2026-09-16).
 //
-// Until that fix no seed was locked in practice: GORM dropped false in favour of
-// the column default. The owner then chose to lock the accounts the app posts to
-// by itself -- 1030 Card Clearing and the cost-of-sales automatics 5000, 5010,
-// 5020, 5050, 5070, 5080, 5090 -- and to add 5095 for hand corrections.
+// Until ISSUE-063 no seed was locked in practice: the model tagged the field
+// default:true, and GORM writes a tag default in place of false. The owner
+// chose to lock the accounts the app posts to by itself -- 1030 Card Clearing
+// and the cost-of-sales automatics 5000, 5010, 5020, 5050, 5070, 5080, 5090 --
+// and to add 5095 for hand corrections.
 //
 // The seed originally marked 20 more as locked (receivables, payables,
 // inventory, VAT, advances, equity, sales income). They have never been locked
@@ -149,6 +150,9 @@ func SeedDefaultChartOfAccounts(tx *gorm.DB, businessID string, requestedBranchI
 			if count > 0 {
 				continue
 			}
+			// Header rows have always been stored as allowing manual posting
+			// (they are never posted to; is_header guards that). Keep them so
+			// new businesses match existing ones. (ISSUE-063)
 			account := ChartAccount{
 				ID:                 utils.NewUUID(),
 				BusinessID:         businessID,
@@ -162,13 +166,10 @@ func SeedDefaultChartOfAccounts(tx *gorm.DB, businessID string, requestedBranchI
 				IsSystemAccount:    true,
 				IsControlAccount:   seed.IsControlAccount,
 				IsHeader:           seed.IsHeader,
-				AllowManualPosting: seed.AllowManualPosting,
+				AllowManualPosting: seed.AllowManualPosting || seed.IsHeader,
 				Status:             "active",
 			}
-			// Select("*"): without it GORM drops AllowManualPosting=false in
-			// favour of the column default TRUE, and no seeded account was ever
-			// actually locked. (ISSUE-039)
-			if err := tx.Select("*").Create(&account).Error; err != nil {
+			if err := tx.Create(&account).Error; err != nil {
 				return err
 			}
 		}

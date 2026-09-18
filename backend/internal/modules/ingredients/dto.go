@@ -24,14 +24,16 @@ type LookupQuery struct {
 	Limit  int
 }
 
+// CreateIngredientRequest: an omitted IsStockTracked and IsExpiryTracked means on, as the column
+// default. (ISSUE-063)
 type CreateIngredientRequest struct {
 	IngredientName       string       `json:"ingredient_name" binding:"required"`
 	IngredientCategoryID string       `json:"ingredient_category_id" binding:"required"`
 	SupplierID           string       `json:"supplier_id"`
 	UnitID               string       `json:"unit_id" binding:"required"`
 	CostPerUnit          money.Amount `json:"cost_per_unit"`
-	IsStockTracked       bool         `json:"is_stock_tracked"`
-	IsExpiryTracked      bool         `json:"is_expiry_tracked"`
+	IsStockTracked       *bool        `json:"is_stock_tracked"`
+	IsExpiryTracked      *bool        `json:"is_expiry_tracked"`
 	ReorderLevel         money.Amount `json:"reorder_level"`
 	Description          string       `json:"description"`
 	ImageURL             string       `json:"image_url"`

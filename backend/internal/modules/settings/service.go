@@ -199,7 +199,7 @@ func (s *Service) CreatePaymentMethod(currentUser *utils.AuthContext, req Create
 		MethodName:                name,
 		MethodType:                methodType,
 		IsDefault:                 req.IsDefault,
-		AllowSplitPayment:         req.AllowSplitPayment,
+		AllowSplitPayment:         defaultBool(req.AllowSplitPayment, true),
 		RequiresReference:         req.RequiresReference,
 		ShowInPOS:                 defaultBool(req.ShowInPOS, defaultShowInPOS(methodType)),
 		ShowInBakeryOrders:        defaultBool(req.ShowInBakeryOrders, true),

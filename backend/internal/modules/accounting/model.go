@@ -6,6 +6,9 @@ import (
 	"gorm.io/gorm"
 )
 
+// ChartAccount has no gorm default on AllowManualPosting: GORM writes a tag default in place of
+// false, so an "off" choice was saved "on". The column defaults live in the
+// migrations. (ISSUE-063)
 type ChartAccount struct {
 	ID                 string         `gorm:"type:uuid;primaryKey" json:"id"`
 	BusinessID         string         `gorm:"type:uuid;not null;index" json:"business_id"`
@@ -20,7 +23,7 @@ type ChartAccount struct {
 	IsSystemAccount    bool           `gorm:"not null;default:false" json:"is_system_account"`
 	IsControlAccount   bool           `gorm:"not null;default:false" json:"is_control_account"`
 	IsHeader           bool           `gorm:"not null;default:false" json:"is_header"`
-	AllowManualPosting bool           `gorm:"not null;default:true" json:"allow_manual_posting"`
+	AllowManualPosting bool           `gorm:"not null" json:"allow_manual_posting"`
 	Status             string         `gorm:"size:50;not null;default:active" json:"status"`
 	CreatedByUserID    *string        `gorm:"type:uuid;index" json:"created_by_user_id"`
 	UpdatedByUserID    *string        `gorm:"type:uuid;index" json:"updated_by_user_id"`

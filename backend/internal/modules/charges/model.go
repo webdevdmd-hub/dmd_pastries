@@ -6,6 +6,9 @@ import (
 	"gorm.io/gorm"
 )
 
+// DocumentCharge has no gorm default on IsRefundable: GORM writes a tag default in place of
+// false, so an "off" choice was saved "on". The column defaults live in the
+// migrations. (ISSUE-063)
 type DocumentCharge struct {
 	ID                        string         `gorm:"type:uuid;primaryKey" json:"id"`
 	BusinessID                string         `gorm:"type:uuid;not null;index" json:"business_id"`
@@ -21,7 +24,7 @@ type DocumentCharge struct {
 	TaxRatePercentageSnapshot float64        `gorm:"not null;default:0" json:"tax_rate_percentage_snapshot"`
 	TaxAmount                 float64        `gorm:"not null;default:0" json:"tax_amount"`
 	TotalAmount               float64        `gorm:"not null;default:0" json:"total_amount"`
-	IsRefundable              bool           `gorm:"not null;default:true" json:"is_refundable"`
+	IsRefundable              bool           `gorm:"not null" json:"is_refundable"`
 	SourceChargeID            *string        `gorm:"type:uuid;index" json:"source_charge_id"`
 	CreatedAt                 time.Time      `json:"created_at"`
 	UpdatedAt                 time.Time      `json:"updated_at"`
