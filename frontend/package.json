@@ -60,6 +60,7 @@
     "test:payment-stage-label": "node scripts/check-payment-stage-label.mjs",
     "test:product-flag-labels": "node scripts/check-product-flag-labels.mjs",
     "test:purchasing-supplier-use": "node scripts/check-purchasing-supplier-use.mjs",
+    "test:receipt-preview": "node scripts/check-receipt-preview.mjs",
     "test:recipe-field-errors": "node scripts/check-recipe-field-errors.mjs",
     "test:audit-views": "node scripts/check-audit-views.mjs",
     "test:batch-wastage": "node scripts/check-batch-wastage.mjs",

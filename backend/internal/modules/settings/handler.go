@@ -1,6 +1,9 @@
 package settings
 
 import (
+	"errors"
+	"io"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
@@ -409,8 +412,11 @@ func (h *Handler) PreviewReceiptLayout(c *gin.Context) {
 	if !validUUIDParam(c, "id") {
 		return
 	}
+	// Both fields are optional (sample data is generated when absent) and the
+	// Receipt Layouts page sends no body, so Preview always failed with
+	// "invalid request payload" (EOF). (ISSUE-062)
 	var req ReceiptLayoutPreviewRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
 		handleError(c, apperrors.BadRequest("invalid request payload", err.Error()))
 		return
 	}

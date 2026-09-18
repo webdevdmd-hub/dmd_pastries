@@ -938,11 +938,14 @@ export async function setDefaultReceiptLayout(id: string): Promise<ReceiptLayout
 }
 
 export async function previewReceiptLayout(id: string): Promise<ReceiptLayoutPreview> {
-  const response = await apiRequest<ReceiptLayoutPreview>(
+  const response = await apiRequest<ReceiptLayoutPreview, Record<string, never>>(
     `/api/v1/settings/receipt-layouts/${id}/preview`,
     {
       method: "POST",
       authMode: "appwrite",
+      // The server binds a JSON body; with none, Preview always failed.
+      // Every field is optional. (ISSUE-062)
+      body: {},
       parse: parseReceiptLayoutPreview,
     },
   );
