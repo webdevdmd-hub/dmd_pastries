@@ -26,13 +26,8 @@ func (r *Repository) DB() *gorm.DB {
 	return r.db
 }
 
-// Select("*") writes every column. Product carries bool fields tagged
-// gorm:"default:true", and a plain Create treats false as "not set" and leaves
-// it out of the INSERT, so the database default TRUE won: a product created with
-// "Hide from POS" was saved visible at the till.
-// (ISSUE-061)
 func (r *Repository) Create(tx *gorm.DB, product *Product) error {
-	return tx.Select("*").Create(product).Error
+	return tx.Create(product).Error
 }
 
 func (r *Repository) FindByID(id, businessID, branchID string) (*Product, error) {

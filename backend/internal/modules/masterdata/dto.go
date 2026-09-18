@@ -58,13 +58,15 @@ type SkippedCategoryResponse struct {
 	Reason       string `json:"reason"`
 }
 
+// CreateUnitRequest: an omitted DecimalPrecision means 2, as the column
+// default. (ISSUE-063)
 type CreateUnitRequest struct {
 	UnitCategoryID   string  `json:"unit_category_id" binding:"required,uuid"`
 	UnitName         string  `json:"unit_name" binding:"required"`
 	Symbol           string  `json:"symbol" binding:"required"`
 	BaseUnitID       *string `json:"base_unit_id" binding:"omitempty,uuid"`
 	ConversionFactor float64 `json:"conversion_factor"`
-	DecimalPrecision int     `json:"decimal_precision"`
+	DecimalPrecision *int    `json:"decimal_precision"`
 }
 
 type UpdateUnitRequest struct {

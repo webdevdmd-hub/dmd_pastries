@@ -23,14 +23,16 @@ type LookupQuery struct {
 	Limit  int
 }
 
+// CreatePackagingRequest: an omitted IsStockTracked and IsConsumable means on, as the column
+// default. (ISSUE-063)
 type CreatePackagingRequest struct {
 	PackagingName       string       `json:"packaging_name" binding:"required"`
 	PackagingCategoryID string       `json:"packaging_category_id" binding:"required"`
 	SupplierID          string       `json:"supplier_id"`
 	UnitID              string       `json:"unit_id" binding:"required"`
 	CostPerUnit         money.Amount `json:"cost_per_unit"`
-	IsStockTracked      bool         `json:"is_stock_tracked"`
-	IsConsumable        bool         `json:"is_consumable"`
+	IsStockTracked      *bool        `json:"is_stock_tracked"`
+	IsConsumable        *bool        `json:"is_consumable"`
 	ReorderLevel        money.Amount `json:"reorder_level"`
 	Description         string       `json:"description"`
 	ImageURL            string       `json:"image_url"`

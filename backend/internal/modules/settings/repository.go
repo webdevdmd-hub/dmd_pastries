@@ -191,20 +191,15 @@ func (r *Repository) EnsureDefaultPaymentMethods(tx *gorm.DB, businessID string)
 				return err
 			}
 		}
-		if err := tx.Select("*").Create(&seed).Error; err != nil {
+		if err := tx.Create(&seed).Error; err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// Select("*") writes every column. PaymentMethod carries bool fields tagged
-// gorm:"default:true", and a plain Create treats false as "not set" and leaves
-// it out of the INSERT, so the database default TRUE won: a method created with split payment
-// off, or hidden from POS, bakery orders or the dashboard, was saved switched on.
-// (ISSUE-061)
 func (r *Repository) CreatePaymentMethod(tx *gorm.DB, method *PaymentMethod) error {
-	return tx.Select("*").Create(method).Error
+	return tx.Create(method).Error
 }
 
 func (r *Repository) ListPaymentMethods(businessID string) ([]PaymentMethod, error) {

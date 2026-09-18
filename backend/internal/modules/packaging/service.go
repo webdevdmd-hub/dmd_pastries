@@ -90,8 +90,8 @@ func (s *Service) Create(currentUser *utils.AuthContext, req CreatePackagingRequ
 			Description:         strings.TrimSpace(req.Description),
 			UnitID:              strings.TrimSpace(req.UnitID),
 			CostPerUnit:         req.CostPerUnit,
-			IsStockTracked:      req.IsStockTracked,
-			IsConsumable:        req.IsConsumable,
+			IsStockTracked:      boolOrTrue(req.IsStockTracked),
+			IsConsumable:        boolOrTrue(req.IsConsumable),
 			ReorderLevel:        req.ReorderLevel,
 			ImageURL:            nullableString(req.ImageURL),
 			ImageFileID:         strings.TrimSpace(req.ImageFileID),
@@ -99,9 +99,6 @@ func (s *Service) Create(currentUser *utils.AuthContext, req CreatePackagingRequ
 			Status:              "active",
 			CreatedByUserID:     currentUser.UserID,
 			UpdatedByUserID:     currentUser.UserID,
-		}
-		if !req.IsStockTracked {
-			item.IsStockTracked = false
 		}
 		if err := s.repo.Create(tx, item); err != nil {
 			return err
@@ -482,4 +479,9 @@ func notFound(err error, message string) error {
 func (s *Service) DeductPackagingOnSale(saleID string) error {
 	// TODO: Wire after POS sale packaging rules are finalized.
 	return nil
+}
+
+// boolOrTrue reads an optional create flag whose column defaults to true.
+func boolOrTrue(value *bool) bool {
+	return value == nil || *value
 }

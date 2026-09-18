@@ -53,19 +53,22 @@ func (TaxRate) TableName() string {
 	return "tax_rates"
 }
 
+// PaymentMethod has no gorm default on its show/split flags: GORM writes a tag default in place of
+// false, so an "off" choice was saved "on". The column defaults live in the
+// migrations. (ISSUE-063)
 type PaymentMethod struct {
 	ID                        string         `gorm:"type:uuid;primaryKey" json:"id"`
 	BusinessID                string         `gorm:"type:uuid;not null;index" json:"business_id"`
 	MethodName                string         `gorm:"size:150;not null" json:"method_name"`
 	MethodType                string         `gorm:"size:50;not null" json:"method_type"`
 	IsDefault                 bool           `gorm:"not null;default:false" json:"is_default"`
-	AllowSplitPayment         bool           `gorm:"not null;default:true" json:"allow_split_payment"`
+	AllowSplitPayment         bool           `gorm:"not null" json:"allow_split_payment"`
 	RequiresReference         bool           `gorm:"not null;default:false" json:"requires_reference"`
-	ShowInPOS                 bool           `gorm:"not null;default:true" json:"show_in_pos"`
-	ShowInBakeryOrders        bool           `gorm:"not null;default:true" json:"show_in_bakery_orders"`
+	ShowInPOS                 bool           `gorm:"not null" json:"show_in_pos"`
+	ShowInBakeryOrders        bool           `gorm:"not null" json:"show_in_bakery_orders"`
 	ShowInPurchasing          bool           `gorm:"not null;default:false" json:"show_in_purchasing"`
 	ShowInExpenses            bool           `gorm:"not null;default:false" json:"show_in_expenses"`
-	ShowInDashboardCollection bool           `gorm:"not null;default:true" json:"show_in_dashboard_collection"`
+	ShowInDashboardCollection bool           `gorm:"not null" json:"show_in_dashboard_collection"`
 	DefaultPaymentAccountID   *string        `gorm:"type:uuid;index" json:"default_payment_account_id"`
 	Status                    string         `gorm:"size:50;not null;default:active" json:"status"`
 	CreatedAt                 time.Time      `json:"created_at"`

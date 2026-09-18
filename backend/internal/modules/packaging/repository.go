@@ -17,13 +17,8 @@ type Repository struct {
 
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
-// Select("*") writes every column. Packaging carries bool fields tagged
-// gorm:"default:true", and a plain Create treats false as "not set" and leaves
-// it out of the INSERT, so the database default TRUE won: packaging created as not
-// stock-tracked or not consumable was saved as both.
-// (ISSUE-061)
 func (r *Repository) Create(tx *gorm.DB, item *PackagingItem) error {
-	return tx.Select("*").Create(item).Error
+	return tx.Create(item).Error
 }
 
 func (r *Repository) FindByID(id, businessID, branchID string) (*PackagingItem, error) {

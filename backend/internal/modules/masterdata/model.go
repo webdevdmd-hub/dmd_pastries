@@ -53,6 +53,8 @@ func (UnitCategory) TableName() string {
 	return "unit_categories"
 }
 
+// Unit.DecimalPrecision has no gorm default: GORM writes a tag default in place
+// of 0, so a whole-number unit was saved with 2 decimals. (ISSUE-063)
 type Unit struct {
 	ID               string         `gorm:"type:uuid;primaryKey" json:"id"`
 	BusinessID       *string        `gorm:"type:uuid;index" json:"business_id"`
@@ -62,7 +64,7 @@ type Unit struct {
 	Symbol           string         `gorm:"size:50;not null" json:"symbol"`
 	BaseUnitID       *string        `gorm:"type:uuid;index" json:"base_unit_id"`
 	ConversionFactor float64        `gorm:"not null;default:1" json:"conversion_factor"`
-	DecimalPrecision int            `gorm:"not null;default:2" json:"decimal_precision"`
+	DecimalPrecision int            `gorm:"not null" json:"decimal_precision"`
 	IsSystemDefault  bool           `gorm:"not null;default:false" json:"is_system_default"`
 	Status           string         `gorm:"size:50;not null;default:active" json:"status"`
 	CreatedAt        time.Time      `json:"created_at"`
