@@ -255,7 +255,28 @@ func (s *Service) Alerts(currentUser *utils.AuthContext, values url.Values) (*Al
 	if err != nil {
 		return nil, apperrors.Internal("failed to load dashboard alerts")
 	}
-	return result, nil
+	return alertsVisibleTo(currentUser, result), nil
+}
+
+// alertsVisibleTo keeps only the alert groups whose module the user may view.
+// dashboard.view alone showed a till-only role bakery-order numbers with their
+// outstanding balances (ISSUE-068). Emptied groups stay empty slices, not
+// null, so the response shape does not change.
+func alertsVisibleTo(currentUser *utils.AuthContext, alerts *AlertsResponse) *AlertsResponse {
+	if !hasAnyPermission(currentUser, "inventory.view", "inventory.low_stock.view") {
+		alerts.LowStockAlerts = []LowStockAlert{}
+	}
+	if !hasAnyPermission(currentUser, "inventory.view", "inventory.expiry.view") {
+		alerts.ExpiryAlerts = []ExpiryAlert{}
+	}
+	if !hasAnyPermission(currentUser, "orders.view") {
+		alerts.PendingOrderAlerts = []PendingOrderAlert{}
+		alerts.OutstandingPaymentAlerts = []OutstandingPaymentAlert{}
+	}
+	if !hasAnyPermission(currentUser, "manufacturing.view") {
+		alerts.ProductionDelayAlerts = []ProductionDelayAlert{}
+	}
+	return alerts
 }
 
 func (s *Service) KPISummary(currentUser *utils.AuthContext, values url.Values) (*KPISummaryResponse, error) {
