@@ -5,6 +5,7 @@ import type { JSX } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { useConfirm } from "@/components/app/confirm-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -13,6 +14,7 @@ import {
   useDeleteCustomerNote,
 } from "@/hooks/use-customers";
 import { getErrorMessage } from "@/lib/api/client";
+import { notePreview } from "@/lib/notes/note-preview";
 import { createCustomerNoteSchema } from "@/lib/validators/customer.schema";
 
 type CustomerNotesSectionProps = {
@@ -28,6 +30,7 @@ export function CustomerNotesSection({
   const notesQuery = useCustomerNotes(customerId);
   const createMutation = useCreateCustomerNote();
   const deleteMutation = useDeleteCustomerNote();
+  const confirm = useConfirm();
 
   const createNote = async (): Promise<void> => {
     const parsed = createCustomerNoteSchema.safeParse({ note });
@@ -41,6 +44,27 @@ export function CustomerNotesSection({
       await createMutation.mutateAsync({ customerId, payload: parsed.data });
       toast.success("Note added.");
       setNote("");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
+  };
+
+  // One click used to delete the note with no confirmation, no confirmation
+  // toast, and a failure that vanished silently (ISSUE-093).
+  const deleteNote = async (noteId: string, text: string): Promise<void> => {
+    const confirmed = await confirm({
+      cancelLabel: "Keep note",
+      confirmLabel: "Delete note",
+      consequence: `This removes the note “${notePreview(text)}” from this customer. The delete is kept in the audit log.`,
+      title: "Delete this note?",
+      tone: "danger",
+    });
+    if (!confirmed) {
+      return;
+    }
+    try {
+      await deleteMutation.mutateAsync({ customerId, noteId });
+      toast.success("Note deleted.");
     } catch (error) {
       toast.error(getErrorMessage(error));
     }
@@ -107,10 +131,7 @@ export function CustomerNotesSection({
                     aria-label="Delete note"
                     disabled={deleteMutation.isPending}
                     onClick={() => {
-                      void deleteMutation.mutateAsync({
-                        customerId,
-                        noteId: customerNote.id,
-                      });
+                      void deleteNote(customerNote.id, customerNote.note);
                     }}
                     size="icon"
                     type="button"
