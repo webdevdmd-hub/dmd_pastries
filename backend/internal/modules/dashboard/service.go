@@ -148,6 +148,12 @@ func (s *Service) PurchasingDashboard(currentUser *utils.AuthContext, values url
 }
 
 func (s *Service) RecentActivity(currentUser *utils.AuthContext, values url.Values) ([]ActivityFeedItem, error) {
+	// The feed is the audit trail: staff logins, users created and deleted,
+	// role changes. The Audit Logs page needs audit_logs.view for exactly this
+	// data, and dashboard.view alone let a till-only role read it (ISSUE-067).
+	if !hasAnyPermission(currentUser, "audit_logs.view") {
+		return nil, apperrors.Forbidden("recent activity needs audit_logs.view")
+	}
 	scope, err := resolveScope(currentUser, values)
 	if err != nil {
 		return nil, err
@@ -249,7 +255,28 @@ func (s *Service) Alerts(currentUser *utils.AuthContext, values url.Values) (*Al
 	if err != nil {
 		return nil, apperrors.Internal("failed to load dashboard alerts")
 	}
-	return result, nil
+	return alertsVisibleTo(currentUser, result), nil
+}
+
+// alertsVisibleTo keeps only the alert groups whose module the user may view.
+// dashboard.view alone showed a till-only role bakery-order numbers with their
+// outstanding balances (ISSUE-068). Emptied groups stay empty slices, not
+// null, so the response shape does not change.
+func alertsVisibleTo(currentUser *utils.AuthContext, alerts *AlertsResponse) *AlertsResponse {
+	if !hasAnyPermission(currentUser, "inventory.view", "inventory.low_stock.view") {
+		alerts.LowStockAlerts = []LowStockAlert{}
+	}
+	if !hasAnyPermission(currentUser, "inventory.view", "inventory.expiry.view") {
+		alerts.ExpiryAlerts = []ExpiryAlert{}
+	}
+	if !hasAnyPermission(currentUser, "orders.view") {
+		alerts.PendingOrderAlerts = []PendingOrderAlert{}
+		alerts.OutstandingPaymentAlerts = []OutstandingPaymentAlert{}
+	}
+	if !hasAnyPermission(currentUser, "manufacturing.view") {
+		alerts.ProductionDelayAlerts = []ProductionDelayAlert{}
+	}
+	return alerts
 }
 
 func (s *Service) KPISummary(currentUser *utils.AuthContext, values url.Values) (*KPISummaryResponse, error) {

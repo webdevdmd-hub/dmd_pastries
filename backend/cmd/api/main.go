@@ -285,7 +285,10 @@ func main() {
 		productHandler,
 		authMiddleware.RequireAuth(),
 		permit("products.view"),
-		permit("products.create", "products.edit", "products.delete", "products.status.update", "products.images.manage", "products.manage"),
+		permit("products.create", "products.manage"),
+		permit("products.edit", "products.manage"),
+		permit("products.status.update", "products.manage"),
+		permit("products.delete", "products.manage"),
 		permit("products.view", "pos.view"),
 		// Product picker for forms that create or edit something that names a
 		// product. Being allowed to write the order is what unlocks the list.
@@ -304,7 +307,10 @@ func main() {
 		authMiddleware.RequireAuth(),
 		permit("pos.view"),
 		permit("pos.view", "pos.sell", "pos.checkout"),
-		permit("pos.sell", "pos.checkout", "pos.hold_sale", "pos.resume_sale", "pos.cancel_held_sale"),
+		permit("pos.sell", "pos.checkout"),
+		permit("pos.hold_sale"),
+		permit("pos.resume_sale"),
+		permit("pos.cancel_held_sale"),
 		permit("pos.refund"),
 		permit("pos.void", "pos.refund"),
 	)

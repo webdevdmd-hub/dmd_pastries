@@ -238,6 +238,9 @@ func (s *Service) Checkout(currentUser *utils.AuthContext, req CheckoutRequest, 
 	if err := requireNoTaxPermission(currentUser, calculation.TaxMode); err != nil {
 		return nil, err
 	}
+	if err := requireDiscountPermission(currentUser, calculation.DiscountAmount); err != nil {
+		return nil, err
+	}
 	if len(req.Payments) == 0 && calculation.TotalAmount > 0 {
 		return nil, apperrors.BadRequest("payments are required", nil)
 	}
@@ -1158,6 +1161,22 @@ func requireNoTaxPermission(currentUser *utils.AuthContext, taxMode string) erro
 		}
 	}
 	return apperrors.Forbidden("missing permission to apply the no-tax mode")
+}
+
+// requireDiscountPermission gates any discount, on a line or on the whole
+// sale, behind pos.discount.apply. It is checked on the calculated amount so
+// every way of asking for money off is covered. Nothing checked it before: on
+// production a role without the permission took 10% off a sale (ISSUE-066).
+func requireDiscountPermission(currentUser *utils.AuthContext, discountAmount float64) error {
+	if discountAmount <= 0 {
+		return nil
+	}
+	for _, permission := range currentUser.Permissions {
+		if permission == "pos.discount.apply" {
+			return nil
+		}
+	}
+	return apperrors.Forbidden("missing permission to apply a discount")
 }
 
 type heldSaleCalculation struct {

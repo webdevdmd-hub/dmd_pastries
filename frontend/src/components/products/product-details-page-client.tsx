@@ -17,6 +17,7 @@ import { ProductFormDialog } from "@/components/products/product-form-dialog";
 import { ProductStatusBadge } from "@/components/products/product-status-badge";
 import { ProductVariantFormDialog } from "@/components/products/product-variant-form-dialog";
 import { ProductsTableSkeleton } from "@/components/products/products-table-skeleton";
+import { useProductPermissions } from "@/components/products/use-product-permissions";
 import { FailedState } from "@/components/shared/collection-state";
 import { Button } from "@/components/ui/button";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -47,13 +48,7 @@ import type {
 export function ProductDetailsPageClient({ productId }: { productId: string }): JSX.Element {
   const { hasAnyPermission } = usePermission();
   const canView = hasAnyPermission([PERMISSIONS.productsView]);
-  const canManage = hasAnyPermission([
-    PERMISSIONS.productsCreate,
-    PERMISSIONS.productsEdit,
-    PERMISSIONS.productsDelete,
-    PERMISSIONS.productsStatusUpdate,
-    PERMISSIONS.productsVariantsManage,
-  ]);
+  const { canEdit, canManageVariants } = useProductPermissions();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -157,7 +152,7 @@ export function ProductDetailsPageClient({ productId }: { productId: string }): 
             {product.unitName}
           </p>
         </div>
-        {canManage ? (
+        {canEdit ? (
           <Button onClick={() => setEditOpen(true)} type="button" variant="outline">
             <Pencil className="h-4 w-4" />
             Edit product
@@ -167,7 +162,7 @@ export function ProductDetailsPageClient({ productId }: { productId: string }): 
 
       <ProductDetailsPanel
         activeTab={activeTab}
-        canManage={canManage}
+        canManageVariants={canManageVariants}
         onAddVariant={() => {
           setSelectedVariant(null);
           setVariantOpen(true);

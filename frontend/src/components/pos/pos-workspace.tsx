@@ -159,10 +159,14 @@ function createAutoSelectedPayment(method: PaymentMethod, amount: number): Payme
 export function POSWorkspace(): JSX.Element {
   const { user } = useAuth();
   const branchScope = useBranchScope();
-  const { hasAnyPermission, hasPermission } = usePermission();
+  const { hasPermission } = usePermission();
   const confirm = useConfirm();
   const canSell = hasPermission(PERMISSIONS.posSell);
-  const canCreateBakeryOrder = hasAnyPermission([PERMISSIONS.ordersCreate, PERMISSIONS.posSell]);
+  const canApplyDiscount = hasPermission(PERMISSIONS.posDiscountApply);
+  // The bakery-order form opens on orders.view and saves on orders.create;
+  // pos.sell unlocked the button, then the dialog said "Access denied" (ISSUE-069).
+  const canCreateBakeryOrder =
+    hasPermission(PERMISSIONS.ordersView) && hasPermission(PERMISSIONS.ordersCreate);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [createOrderOpen, setCreateOrderOpen] = useState(false);
@@ -919,6 +923,7 @@ export function POSWorkspace(): JSX.Element {
       </Dialog>
 
       <POSCheckoutDialog
+        canApplyDiscount={canApplyDiscount}
         charges={cart.charges}
         confirmButtonLabel={checkoutBlocker?.buttonLabel ?? "Confirm sale"}
         customerCreditBalance={customerCreditBalance}

@@ -22,7 +22,7 @@ import {
 
 type ProductDetailsPanelProps = {
   activeTab: ProductDetailTabKey;
-  canManage: boolean;
+  canManageVariants: boolean;
   onAddVariant: () => void;
   onDeleteVariant: (variant: ProductVariant) => void;
   onEditVariant: (variant: ProductVariant) => void;
@@ -88,7 +88,7 @@ type FlagProps = {
  */
 export function ProductDetailsPanel({
   activeTab,
-  canManage,
+  canManageVariants,
   onAddVariant,
   onDeleteVariant,
   onEditVariant,
@@ -206,7 +206,7 @@ export function ProductDetailsPanel({
 
         {activeTab === "variants" ? (
           <ProductVariantsSection
-            canManage={canManage}
+            canManage={canManageVariants}
             onAdd={onAddVariant}
             onDelete={onDeleteVariant}
             onEdit={onEditVariant}

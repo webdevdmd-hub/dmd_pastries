@@ -28,10 +28,30 @@ import { usePermission } from "@/hooks/use-permission";
 import { getErrorMessage } from "@/lib/api/client";
 
 const actions = [
-  { href: ROUTES.pos, icon: ReceiptText, label: "Open POS Billing" },
-  { href: ROUTES.customers, icon: UserRound, label: "Create Customer" },
-  { href: ROUTES.orders, icon: ShoppingBag, label: "View Ready Orders" },
-  { href: ROUTES.payments, icon: WalletCards, label: "Add Payment" },
+  {
+    href: ROUTES.pos,
+    icon: ReceiptText,
+    label: "Open POS Billing",
+    requires: [PERMISSIONS.posView],
+  },
+  {
+    href: ROUTES.customers,
+    icon: UserRound,
+    label: "Create Customer",
+    requires: [PERMISSIONS.customersView, PERMISSIONS.customersCreate],
+  },
+  {
+    href: ROUTES.orders,
+    icon: ShoppingBag,
+    label: "View Ready Orders",
+    requires: [PERMISSIONS.ordersView],
+  },
+  {
+    href: ROUTES.payments,
+    icon: WalletCards,
+    label: "Add Payment",
+    requires: [PERMISSIONS.paymentsView, PERMISSIONS.paymentsAdd],
+  },
 ] as const;
 
 export function CashierDashboardClient(): JSX.Element {

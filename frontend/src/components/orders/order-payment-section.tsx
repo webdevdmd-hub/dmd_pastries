@@ -1,15 +1,14 @@
 "use client";
 
 import { CreditCard, Plus } from "lucide-react";
-import Link from "next/link";
 import type { JSX } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { OrderPaymentDialog } from "@/components/orders/order-payment-dialog";
 import { OrderRefundDialog } from "@/components/orders/order-refund-dialog";
+import { AccountingJournalLink } from "@/components/shared/accounting-reference-links";
 import { Button } from "@/components/ui/button";
-import { ROUTES } from "@/constants/routes";
 import { useAddOrderPayment, useOrderPayments, useRefundOrderPayment } from "@/hooks/use-orders";
 import { usePaymentMethods } from "@/hooks/use-payments";
 import { getErrorMessage } from "@/lib/api/client";
@@ -158,17 +157,7 @@ export function OrderPaymentSection({
               {orderPaymentTypeLabel(payment.paymentType)}: {payment.paymentMethodName} -{" "}
               {formatCurrency(payment.amount)}
             </span>
-            {payment.journalEntryId ? (
-              <Button asChild size="sm" variant="outline">
-                <Link
-                  href={`${ROUTES.accountingJournalEntries}?search=${encodeURIComponent(
-                    payment.journalEntryId,
-                  )}`}
-                >
-                  View Journal
-                </Link>
-              </Button>
-            ) : null}
+            <AccountingJournalLink id={payment.journalEntryId ?? null} />
           </div>
         ))}
         {order && !paymentsQuery.isLoading && (paymentsQuery.data ?? []).length === 0 ? (

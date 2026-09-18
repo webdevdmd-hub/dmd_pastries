@@ -1,9 +1,9 @@
 "use client";
 
 import { Download, Printer } from "lucide-react";
-import Link from "next/link";
 import type { JSX } from "react";
 
+import { AccountingJournalLink } from "@/components/shared/accounting-reference-links";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,7 +13,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ROUTES } from "@/constants/routes";
 import type { SaleReceipt } from "@/types/pos";
 import type { ReceiptLayout, ReceiptLayoutConfig, ReceiptLayoutType } from "@/types/settings";
 
@@ -311,22 +310,10 @@ export function POSReceiptDialog({
             {config.termsText ? (
               <p className="text-xs text-foreground-muted">{config.termsText}</p>
             ) : null}
-            {receipt.accountingJournalEntryId ? (
-              <Button
-                asChild
-                className="rounded-md border-border bg-card text-foreground hover:bg-muted print:hidden"
-                size="sm"
-                variant="outline"
-              >
-                <Link
-                  href={`${ROUTES.accountingJournalEntries}?search=${encodeURIComponent(
-                    receipt.accountingJournalEntryId,
-                  )}`}
-                >
-                  View Journal
-                </Link>
-              </Button>
-            ) : null}
+            <AccountingJournalLink
+              className="rounded-md border-border bg-card text-foreground hover:bg-muted print:hidden"
+              id={receipt.accountingJournalEntryId ?? null}
+            />
           </div>
         ) : null}
         <DialogFooter>

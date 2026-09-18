@@ -26,6 +26,7 @@ import { ProductsCardGrid } from "@/components/products/products-card-grid";
 import { ProductsTable } from "@/components/products/products-table";
 import { ProductsTableSkeleton } from "@/components/products/products-table-skeleton";
 import { ProductsToolbar } from "@/components/products/products-toolbar";
+import { useProductPermissions } from "@/components/products/use-product-permissions";
 import { EmptyState, FailedState, FilteredState } from "@/components/shared/collection-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
@@ -212,15 +213,9 @@ export function ProductsPageClient(): JSX.Element {
   const [suggestionPrices, setSuggestionPrices] = useState<Record<string, string>>({});
 
   const canViewProducts = hasAnyPermission([PERMISSIONS.productsView]);
-  const canCreateProducts = hasAnyPermission([PERMISSIONS.productsCreate]);
+  const productPermissions = useProductPermissions();
+  const canCreateProducts = productPermissions.canCreate;
   const canViewInventory = hasAnyPermission([PERMISSIONS.inventoryView]);
-  const canManageProducts = hasAnyPermission([
-    PERMISSIONS.productsCreate,
-    PERMISSIONS.productsEdit,
-    PERMISSIONS.productsDelete,
-    PERMISSIONS.productsStatusUpdate,
-    PERMISSIONS.productsVariantsManage,
-  ]);
   // The search box writes into filters on every keystroke; only the debounced
   // value may reach the query key, or each keystroke becomes a fetch plus a
   // permanently cached query entry.
@@ -453,7 +448,6 @@ export function ProductsPageClient(): JSX.Element {
   };
 
   const listHandlers = {
-    canManage: canManageProducts,
     inventoryAvailable: canViewInventory && inventoryQuery.isSuccess,
     inventoryByProduct,
     onDelete: (product: Product) => setConfirmState({ action: "delete", product }),
@@ -462,6 +456,7 @@ export function ProductsPageClient(): JSX.Element {
     onStatusChange: (product: Product, status: ProductStatus) =>
       setConfirmState({ action: "status", nextStatus: status, product }),
     onView: (product: Product) => openDetails(product),
+    permissions: productPermissions,
     products: list,
   };
 
@@ -729,7 +724,8 @@ export function ProductsPageClient(): JSX.Element {
       />
 
       <ProductDetailsDrawer
-        canManage={canManageProducts}
+        canEdit={productPermissions.canEdit}
+        canManageVariants={productPermissions.canManageVariants}
         initialTab={detailsTab}
         onAddVariant={() => {
           setSelectedVariant(null);

@@ -73,7 +73,9 @@ export function POSTopBar({ branchName, cashierName, onMenuClick }: POSTopBarPro
 
       <div className="flex min-w-0 items-center justify-end gap-3">
         <div className="text-body hidden border-l border-border pl-4 sm:block">
-          <p className="font-medium text-foreground">Admin User</p>
+          {/* Who is signed in to this till. It read "Admin User" for everyone,
+              so staff at a shared counter could not tell (ISSUE-070). */}
+          <p className="font-medium text-foreground">{cashierName}</p>
           <p className="flex items-center gap-1.5 text-foreground-muted">
             <span className="h-2 w-2 rounded-full bg-money" />
             Connected

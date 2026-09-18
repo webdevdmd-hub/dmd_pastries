@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { type JSX, useState } from "react";
 import { toast } from "sonner";
 
@@ -16,6 +15,7 @@ import { OrderPaymentSection } from "@/components/orders/order-payment-section";
 import { OrderProductionSection } from "@/components/orders/order-production-section";
 import { OrderStatusBadge } from "@/components/orders/order-status-badge";
 import { OrderTimeline } from "@/components/orders/order-timeline";
+import { AccountingJournalLink } from "@/components/shared/accounting-reference-links";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -25,7 +25,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ROUTES } from "@/constants/routes";
 import { useUpdateOrderStatus } from "@/hooks/use-orders";
 import { getErrorMessage } from "@/lib/api/client";
 import { allowedOrderTransitions } from "@/lib/orders/status-rules";
@@ -109,17 +108,7 @@ export function OrderDetailsPanel({
               <p className="text-cell tabular-nums text-brand-mocha">
                 Balance {formatCurrency(order.balanceAmount)}
               </p>
-              {order.accountingJournalEntryId ? (
-                <Button asChild size="sm" variant="outline">
-                  <Link
-                    href={`${ROUTES.accountingJournalEntries}?search=${encodeURIComponent(
-                      order.accountingJournalEntryId,
-                    )}`}
-                  >
-                    View Journal
-                  </Link>
-                </Button>
-              ) : null}
+              <AccountingJournalLink id={order.accountingJournalEntryId ?? null} />
             </div>
           </div>
           {/* This row used to be a flat list of all six statuses with only the
