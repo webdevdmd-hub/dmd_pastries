@@ -1,6 +1,7 @@
 package suppliers
 
 import (
+	"fmt"
 	"pastries-pos/internal/shared/money"
 	"regexp"
 	"strings"
@@ -218,7 +219,15 @@ func (s *Service) DeleteSupplier(currentUser *utils.AuthContext, id, ipAddress, 
 		if err := s.repo.Update(tx, id, currentUser.BusinessID, branchID, map[string]interface{}{"status": "inactive", "updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC(), "deleted_at": gorm.DeletedAt{Time: time.Now().UTC(), Valid: true}}); err != nil {
 			return mapSupplierNotFound(err, "supplier not found")
 		}
-		return s.writeAudit(tx, currentUser, "supplier.deleted", id, "Supplier deleted.", ipAddress, userAgent)
+		ingredients, packaging, err := s.repo.ClearItemSupplier(tx, currentUser.BusinessID, id)
+		if err != nil {
+			return apperrors.Internal("failed to clear the supplier from ingredients and packaging")
+		}
+		summary := "Supplier deleted."
+		if ingredients+packaging > 0 {
+			summary = fmt.Sprintf("Supplier deleted and cleared from %d ingredients and %d packaging items.", ingredients, packaging)
+		}
+		return s.writeAudit(tx, currentUser, "supplier.deleted", id, summary, ipAddress, userAgent)
 	})
 }
 

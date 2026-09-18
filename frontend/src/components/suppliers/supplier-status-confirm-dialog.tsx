@@ -54,7 +54,7 @@ export function SupplierStatusConfirmDialog({
           </DialogTitle>
           <DialogDescription>
             {isDelete
-              ? "This removes the supplier. Only a supplier with no purchase orders, bills or payments can be deleted; one with history is refused and should be deactivated instead."
+              ? "This removes the supplier, and ingredients and packaging items that name it as their supplier are left with none. Only a supplier with no purchase orders, bills or payments can be deleted; one with history is refused and should be deactivated instead."
               : copy?.summary}
           </DialogDescription>
         </DialogHeader>
