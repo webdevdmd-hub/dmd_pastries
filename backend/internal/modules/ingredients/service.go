@@ -11,6 +11,7 @@ import (
 
 	"pastries-pos/internal/modules/audit"
 	"pastries-pos/internal/modules/inventory"
+	"pastries-pos/internal/shared/deleteguard"
 	apperrors "pastries-pos/internal/shared/errors"
 	"pastries-pos/internal/shared/utils"
 )
@@ -277,20 +278,37 @@ func (s *Service) Delete(currentUser *utils.AuthContext, id, ipAddress, userAgen
 	if err != nil {
 		return err
 	}
+	item, err := s.repo.FindByID(id, currentUser.BusinessID, branchID)
+	if err != nil {
+		return notFound(err, "ingredient not found")
+	}
+	// One rule for every catalogue item with an auto-created inventory row
+	// (ISSUE-083). Creating an ingredient creates its inventory row, so the old
+	// "refuse if any inventory row exists" refused almost every delete, while
+	// the rows of the few that got through stayed in inventory. Now the row
+	// only blocks the delete once it has history, and otherwise goes with the
+	// ingredient.
 	return s.db.Transaction(func(tx *gorm.DB) error {
-		hasInventory, err := s.repo.HasInventory(tx, currentUser.BusinessID, id)
+		uses, err := s.inventoryRepo.StockUses(tx, currentUser.BusinessID, inventory.OwnedByIngredient, id)
 		if err != nil {
 			return err
 		}
-		hasRecipeLines, err := s.repo.HasRecipeLines(tx, currentUser.BusinessID, id)
+		inRecipes, err := s.repo.UsedInRecipes(tx, currentUser.BusinessID, id)
 		if err != nil {
 			return err
 		}
-		if hasInventory || hasRecipeLines {
-			return apperrors.BadRequest("ingredient is linked to inventory or recipes; deactivate it instead", nil)
+		if inRecipes {
+			uses = append(uses, "recipes using it")
 		}
-		if err := s.repo.Update(tx, id, currentUser.BusinessID, branchID, map[string]interface{}{"status": "inactive", "deleted_at": gorm.DeletedAt{Time: time.Now().UTC(), Valid: true}, "updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}); err != nil {
+		if len(uses) > 0 {
+			return deleteguard.Conflict("ingredient_in_use", item.IngredientName, uses, "Deactivate it instead; its records stay.")
+		}
+		now := time.Now().UTC()
+		if err := s.repo.Update(tx, id, currentUser.BusinessID, branchID, map[string]interface{}{"status": "inactive", "deleted_at": gorm.DeletedAt{Time: now, Valid: true}, "updated_by_user_id": currentUser.UserID, "updated_at": now}); err != nil {
 			return notFound(err, "ingredient not found")
+		}
+		if err := s.inventoryRepo.RetireInventoryRows(tx, currentUser.BusinessID, inventory.OwnedByIngredient, id); err != nil {
+			return err
 		}
 		return s.audit(tx, currentUser, "ingredient.deleted", id, "Ingredient deleted", ipAddress, userAgent)
 	})

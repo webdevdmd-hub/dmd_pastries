@@ -158,6 +158,17 @@ func (r *Repository) HasUsageRules(tx *gorm.DB, businessID, packagingItemID stri
 	return count > 0, err
 }
 
+// UsedInRecipes reports whether a recipe packaging line uses the item. Delete
+// only ever asked about usage rules, so an item still on a recipe could be
+// deleted out from under it.
+func (r *Repository) UsedInRecipes(tx *gorm.DB, businessID, packagingItemID string) (bool, error) {
+	var count int64
+	err := tx.Table("recipe_packaging").
+		Where("business_id = ? AND packaging_item_id = ? AND deleted_at IS NULL", businessID, packagingItemID).
+		Count(&count).Error
+	return count > 0, err
+}
+
 func (r *Repository) ToResponse(businessID string, item PackagingItem) PackagingResponse {
 	var categoryName, supplierName, unitName, unitSymbol string
 	_ = r.db.Table("packaging_categories").Select("category_name").Where("id = ? AND business_id = ? AND branch_id = ?", item.PackagingCategoryID, businessID, item.BranchID).Scan(&categoryName).Error

@@ -107,15 +107,15 @@ func (r *Repository) ValidateUnit(tx *gorm.DB, businessID, id string) error {
 	return exists(tx.Table("units").Where("id = ? AND (business_id IS NULL OR business_id = ?) AND status = ? AND deleted_at IS NULL", id, businessID, "active"))
 }
 
-func (r *Repository) HasInventory(tx *gorm.DB, businessID, ingredientID string) (bool, error) {
+// UsedInRecipes reports whether a recipe line uses the ingredient, named
+// directly or through its inventory row (older lines were written either way).
+func (r *Repository) UsedInRecipes(tx *gorm.DB, businessID, ingredientID string) (bool, error) {
+	ownRows := tx.Table("inventory_items").Select("id").Where("business_id = ? AND ingredient_id = ?", businessID, ingredientID)
 	var count int64
-	err := tx.Table("inventory_items").Where("business_id = ? AND item_type = ? AND ingredient_id = ? AND deleted_at IS NULL", businessID, "ingredient", ingredientID).Count(&count).Error
-	return count > 0, err
-}
-
-func (r *Repository) HasRecipeLines(tx *gorm.DB, businessID, ingredientID string) (bool, error) {
-	var count int64
-	err := tx.Table("recipe_ingredients").Where("business_id = ? AND ingredient_id = ? AND deleted_at IS NULL", businessID, ingredientID).Count(&count).Error
+	err := tx.Table("recipe_ingredients").
+		Where("business_id = ? AND deleted_at IS NULL", businessID).
+		Where("(ingredient_id = ? OR inventory_item_id IN (?))", ingredientID, ownRows).
+		Count(&count).Error
 	return count > 0, err
 }
 
