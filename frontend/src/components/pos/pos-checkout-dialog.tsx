@@ -21,6 +21,8 @@ import type { CartDiscountType, CartTotals, PaymentInput } from "@/types/pos";
 import type { PaymentMethod } from "@/types/settings";
 
 type POSCheckoutDialogProps = {
+  // pos.discount.apply. The server refuses a discount without it (ISSUE-066).
+  canApplyDiscount: boolean;
   charges: DocumentChargeDraft[];
   confirmButtonLabel: string;
   customerCreditBalance: number;
@@ -90,6 +92,7 @@ function resolveConfirmLabel(confirmButtonLabel: string, totals: CartTotals): st
 }
 
 export function POSCheckoutDialog({
+  canApplyDiscount,
   charges,
   confirmButtonLabel,
   customerCreditBalance,
@@ -135,14 +138,18 @@ export function POSCheckoutDialog({
         </DialogHeader>
 
         <div className="scrollbar-hidden min-h-0 flex-1 space-y-4 overflow-y-auto">
-          <div className="rounded-lg border border-border bg-muted p-4">
-            <POSDiscountControl
-              label="Sale discount"
-              onChange={onSaleDiscountChange}
-              type={saleDiscountType}
-              value={saleDiscountValue}
-            />
-          </div>
+          {/* A restored cart may already carry a discount; keep the control so
+              a cashier without the permission can set it back to none. */}
+          {canApplyDiscount || saleDiscountType !== null ? (
+            <div className="rounded-lg border border-border bg-muted p-4">
+              <POSDiscountControl
+                label="Sale discount"
+                onChange={onSaleDiscountChange}
+                type={saleDiscountType}
+                value={saleDiscountValue}
+              />
+            </div>
+          ) : null}
 
           <div className="rounded-lg border border-border bg-muted p-4">
             <POSChargesControl charges={charges} onChange={onChargesChange} />

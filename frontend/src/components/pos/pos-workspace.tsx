@@ -162,6 +162,7 @@ export function POSWorkspace(): JSX.Element {
   const { hasAnyPermission, hasPermission } = usePermission();
   const confirm = useConfirm();
   const canSell = hasPermission(PERMISSIONS.posSell);
+  const canApplyDiscount = hasPermission(PERMISSIONS.posDiscountApply);
   const canCreateBakeryOrder = hasAnyPermission([PERMISSIONS.ordersCreate, PERMISSIONS.posSell]);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -919,6 +920,7 @@ export function POSWorkspace(): JSX.Element {
       </Dialog>
 
       <POSCheckoutDialog
+        canApplyDiscount={canApplyDiscount}
         charges={cart.charges}
         confirmButtonLabel={checkoutBlocker?.buttonLabel ?? "Confirm sale"}
         customerCreditBalance={customerCreditBalance}
