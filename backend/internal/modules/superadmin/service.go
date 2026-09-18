@@ -9,15 +9,30 @@ import (
 	"gorm.io/gorm"
 
 	apperrors "pastries-pos/internal/shared/errors"
+	"pastries-pos/internal/shared/userhistory"
 	"pastries-pos/internal/shared/utils"
 )
 
 type Service struct {
 	db *gorm.DB
+	// The logins behind platform users. Without it none of the user
+	// operations could reach Supabase: soft delete left the login open,
+	// restore left a tenant delete's ban in place, and hard delete orphaned
+	// the login with its email reserved forever (ISSUE-075).
+	identities *utils.IdentityManager
 }
 
-func NewService(db *gorm.DB) *Service {
-	return &Service{db: db}
+func NewService(db *gorm.DB, identities *utils.IdentityManager) *Service {
+	return &Service{db: db, identities: identities}
+}
+
+// loginOf is the user's account in each identity provider.
+func loginOf(user UserSummaryResponse) utils.ProviderIDs {
+	ids := utils.ProviderIDs{Appwrite: user.AppwriteUserID}
+	if user.SupabaseUserID != nil {
+		ids.Supabase = *user.SupabaseUserID
+	}
+	return ids
 }
 
 func (s *Service) ListBusinesses(search, status string) ([]BusinessSummaryResponse, error) {
@@ -383,6 +398,8 @@ func (s *Service) UpdateUserAction(currentUser *utils.AuthContext, userID string
 	updates := map[string]interface{}{}
 	actions := []string{}
 	now := time.Now().UTC()
+	// Set by soft_delete and restore: the login follows the row (ISSUE-075).
+	var setLoginEnabled *bool
 
 	if req.Operation != nil {
 		operation := strings.ToLower(strings.TrimSpace(*req.Operation))
@@ -403,6 +420,8 @@ func (s *Service) UpdateUserAction(currentUser *utils.AuthContext, userID string
 			updates["status"] = "deleted"
 			updates["deleted_at"] = now
 			actions = append(actions, "soft_deleted")
+			locked := false
+			setLoginEnabled = &locked
 		case "restore":
 			if before.User.DeletedAt == nil {
 				return nil, apperrors.BadRequest("user is not deleted", nil)
@@ -410,9 +429,14 @@ func (s *Service) UpdateUserAction(currentUser *utils.AuthContext, userID string
 			if err := requireTypedConfirmation(req.ConfirmationText, before.User.Email); err != nil {
 				return nil, err
 			}
+			if !loginOf(before.User).HasLogin() {
+				return nil, apperrors.BadRequest("this user's login was removed when they were deleted; the business must add them again", nil)
+			}
 			updates["status"] = "active"
 			updates["deleted_at"] = nil
 			actions = append(actions, "restored")
+			unlocked := true
+			setLoginEnabled = &unlocked
 		case "hard_delete":
 			if err := requireTypedConfirmation(req.ConfirmationText, before.User.Email); err != nil {
 				return nil, err
@@ -604,6 +628,15 @@ func (s *Service) UpdateUserAction(currentUser *utils.AuthContext, userID string
 	}); err != nil {
 		tx.Rollback()
 		return nil, apperrors.Internal("failed to create platform audit log")
+	}
+
+	// Before commit, so a login the provider would not lock or unlock leaves
+	// the user exactly as they were.
+	if setLoginEnabled != nil && loginOf(before.User).HasLogin() {
+		if err := s.identities.SetUserStatus(loginOf(before.User), *setLoginEnabled); err != nil {
+			tx.Rollback()
+			return nil, apperrors.Internal("could not update the user's login, so nothing was changed; try again")
+		}
 	}
 
 	if err := tx.Commit().Error; err != nil {
@@ -960,6 +993,21 @@ func (s *Service) hardDeleteUser(
 		tx.Rollback()
 		return nil, apperrors.BadRequest("hard delete requires a soft-deleted user", nil)
 	}
+	// Some references to users are deferred to COMMIT (customers, customer
+	// notes). Check them now, before the login is removed, so a protected
+	// reference refuses the delete instead of failing after the login is gone.
+	if err := tx.Exec("SET CONSTRAINTS ALL IMMEDIATE").Error; err != nil {
+		tx.Rollback()
+		return nil, apperrors.Internal("hard delete failed; database still has protected references")
+	}
+
+	// The login goes with the row. It used to survive, orphaned, holding the
+	// email and phone with nothing in the app able to reach it (ISSUE-075).
+	// A login already gone counts as removed.
+	if err := s.identities.DeleteUser(loginOf(before.User)); err != nil {
+		tx.Rollback()
+		return nil, apperrors.Internal("could not remove the user's login, so nothing was deleted; try again")
+	}
 
 	if err := tx.Commit().Error; err != nil {
 		return nil, apperrors.Internal("failed to commit hard delete")
@@ -974,47 +1022,17 @@ func hardDeleteCleanupQueries() []hardDeleteCountQuery {
 	}
 }
 
+// hardDeleteBlockingQueries is the shared definition of history a business
+// must keep (userhistory.References). It used to be a private copy that also
+// counted audit_logs, which every account has from the moment it is created,
+// so no real user could ever be hard-deleted (ISSUE-075).
 func hardDeleteBlockingQueries() []hardDeleteCountQuery {
-	return []hardDeleteCountQuery{
-		{module: "Business", table: "businesses", where: "owner_user_id = ?"},
-		{module: "Branches", table: "branches", where: "manager_user_id = ?"},
-		{module: "Sales", table: "sales", where: "cashier_user_id = ?"},
-		{module: "Sales", table: "held_sales", where: "cashier_user_id = ?"},
-		{module: "Sales", table: "sale_refunds", where: "created_by_user_id = ? OR approved_by_user_id = ?"},
-		{module: "Sales returns", table: "sales_returns", where: "created_by_user_id = ? OR approved_by_user_id = ? OR posted_by_user_id = ? OR cancelled_by_user_id = ?"},
-		{module: "Payments", table: "sale_payments", where: "paid_by_user_id = ?"},
-		{module: "Payments", table: "payment_refunds", where: "created_by_user_id = ? OR approved_by_user_id = ?"},
-		{module: "Payments", table: "purchase_invoice_payments", where: "paid_by_user_id = ?"},
-		{module: "Payments", table: "supplier_payments", where: "paid_by_user_id = ?"},
-		{module: "Customers", table: "customers", where: "created_by_user_id = ? OR updated_by_user_id = ?"},
-		{module: "Customers", table: "customer_notes", where: "created_by_user_id = ?"},
-		{module: "Products", table: "products", where: "created_by = ? OR updated_by = ?"},
-		{module: "Suppliers", table: "suppliers", where: "created_by_user_id = ? OR updated_by_user_id = ?"},
-		{module: "Suppliers", table: "supplier_notes", where: "created_by_user_id = ?"},
-		{module: "Inventory", table: "stock_movements", where: "created_by_user_id = ?"},
-		{module: "Inventory", table: "inventory_adjustments", where: "created_by_user_id = ?"},
-		{module: "Inventory", table: "stock_locations", where: "created_by_user_id = ? OR updated_by_user_id = ?"},
-		{module: "Inventory", table: "stock_transfers", where: "created_by_user_id = ? OR completed_by_user_id = ?"},
-		{module: "Purchasing", table: "purchase_orders", where: "created_by_user_id = ? OR updated_by_user_id = ?"},
-		{module: "Purchasing", table: "purchase_invoices", where: "created_by_user_id = ? OR updated_by_user_id = ? OR cancelled_by_user_id = ?"},
-		{module: "Purchasing", table: "purchase_receipts", where: "received_by_user_id = ?"},
-		{module: "Purchasing", table: "purchase_returns", where: "created_by_user_id = ? OR posted_by_user_id = ? OR cancelled_by_user_id = ? OR reversed_by_user_id = ?"},
-		{module: "Purchasing", table: "purchase_order_revisions", where: "created_by_user_id = ?"},
-		{module: "Manufacturing", table: "production_batches", where: "created_by_user_id = ? OR updated_by_user_id = ? OR completed_by_user_id = ?"},
-		{module: "Bakery orders", table: "bakery_orders", where: "created_by_user_id = ? OR updated_by_user_id = ?"},
-		{module: "Bakery orders", table: "bakery_order_payments", where: "paid_by_user_id = ?"},
-		{module: "Recipes", table: "recipes", where: "created_by_user_id = ? OR updated_by_user_id = ?"},
-		{module: "Recipes", table: "recipe_versions", where: "created_by_user_id = ?"},
-		{module: "Ingredients", table: "ingredients", where: "created_by_user_id = ? OR updated_by_user_id = ?"},
-		{module: "Packaging", table: "packaging_items", where: "created_by_user_id = ? OR updated_by_user_id = ?"},
-		{module: "Accounting", table: "chart_of_accounts", where: "created_by_user_id = ? OR updated_by_user_id = ?"},
-		{module: "Accounting", table: "journal_entries", where: "created_by_user_id = ? OR updated_by_user_id = ? OR posted_by_user_id = ? OR reversed_by_user_id = ?"},
-		{module: "Accounting", table: "expenses", where: "created_by_user_id = ? OR updated_by_user_id = ? OR voided_by_user_id = ?"},
-		{module: "Accounting", table: "account_transfers", where: "created_by_user_id = ?"},
-		{module: "Accounting", table: "platform_settlements", where: "created_by_user_id = ?"},
-		{module: "Accounting", table: "payment_accounts", where: "created_by_user_id = ? OR updated_by_user_id = ?"},
-		{module: "Audit", table: "audit_logs", where: "user_id = ? OR actor_user_id = ? OR target_user_id = ? OR entity_id = ?"},
+	refs := userhistory.References()
+	queries := make([]hardDeleteCountQuery, 0, len(refs))
+	for _, ref := range refs {
+		queries = append(queries, hardDeleteCountQuery{module: ref.Module, table: ref.Table, where: ref.Where})
 	}
+	return queries
 }
 
 func totalRelatedCount(counts []RelatedDataCount) int64 {

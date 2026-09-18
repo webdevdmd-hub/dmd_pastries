@@ -615,12 +615,35 @@ func (s *Service) DeleteChartAccount(currentUser *utils.AuthContext, id, ipAddre
 		if hasChildren {
 			return apperrors.Conflict("chart account cannot be deleted while child accounts exist", nil)
 		}
+		usage, err := s.repo.ChartAccountUsage(tx, currentUser.BusinessID, id)
+		if err != nil {
+			return apperrors.Internal("failed to validate chart account usage")
+		}
+		if err := chartAccountDeleteBlocker(usage); err != nil {
+			return err
+		}
 		updates := map[string]interface{}{"status": "inactive", "updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC(), "deleted_at": gorm.DeletedAt{Time: time.Now().UTC(), Valid: true}}
 		if err := s.repo.Update(tx, currentUser.BusinessID, id, updates); err != nil {
 			return mapChartAccountNotFound(err)
 		}
 		return s.writeAudit(tx, currentUser, "accounting.chart_account_deleted", id, "Chart account deleted.", ipAddress, userAgent)
 	})
+}
+
+// chartAccountDeleteBlocker says why an account cannot be deleted yet, and
+// what to do instead, or returns nil when nothing points at it. (ISSUE-077)
+func chartAccountDeleteBlocker(usage ChartAccountUsage) error {
+	switch {
+	case usage.JournalLines > 0:
+		return apperrors.Conflict("chart account has postings; deactivate it instead", nil)
+	case usage.AccountMappings > 0:
+		return apperrors.Conflict("chart account is used by an account mapping; point the mapping at another account before deleting", nil)
+	case usage.PaymentAccounts > 0:
+		return apperrors.Conflict("chart account is linked to a payment account; link the payment account to another chart account before deleting", nil)
+	case usage.PaymentMethodLinks > 0:
+		return apperrors.Conflict("chart account is linked to a payment method; change the payment method's payment account before deleting", nil)
+	}
+	return nil
 }
 
 func (s *Service) ListPaymentAccounts(currentUser *utils.AuthContext, query PaymentAccountListQuery) (*PaginatedResponse[PaymentAccountResponse], error) {
@@ -1044,6 +1067,13 @@ func (s *Service) DeletePaymentAccount(currentUser *utils.AuthContext, id, ipAdd
 		}
 		if count > 0 {
 			return apperrors.Conflict("payment account is linked to payment methods; unlink it before deleting", nil)
+		}
+		branchCount, err := s.repo.CountBranchPaymentMethodsUsingPaymentAccount(tx, currentUser.BusinessID, id)
+		if err != nil {
+			return apperrors.Internal("failed to validate payment method links")
+		}
+		if branchCount > 0 {
+			return apperrors.Conflict("payment account is a payment method's account for a branch; it cannot be deleted while that branch still takes payments into it", nil)
 		}
 		// Without this the account's opening entry would strand a balance in
 		// 3400 Opening Balance Equity for an account that no longer exists.

@@ -1,6 +1,7 @@
 package pos
 
 import (
+	"errors"
 	"math"
 	"strings"
 	"time"
@@ -755,13 +756,24 @@ func (r *Repository) HeldSaleItems(tx *gorm.DB, businessID, heldSaleID string) (
 	return items, err
 }
 
-func (r *Repository) UpdateHeldSale(tx *gorm.DB, businessID, heldSaleID string, updates map[string]interface{}) error {
-	result := tx.Model(&HeldSale{}).Where("id = ? AND business_id = ? AND deleted_at IS NULL", heldSaleID, businessID).Updates(updates)
+// ErrHeldSaleNotHeld means the sale left "held" before this request could
+// move it: another till resumed or cancelled it first. (ISSUE-096)
+var ErrHeldSaleNotHeld = errors.New("held sale is no longer held")
+
+// ReleaseHeldSale moves a held sale out of "held". The status check is part
+// of the UPDATE rather than a read before it, so of two concurrent requests
+// (a resume and a cancel, or two of either) exactly one matches the row and
+// the other gets ErrHeldSaleNotHeld. Reading the status first and writing
+// unconditionally let both succeed. (ISSUE-096)
+func (r *Repository) ReleaseHeldSale(tx *gorm.DB, businessID, heldSaleID string, updates map[string]interface{}) error {
+	result := tx.Model(&HeldSale{}).
+		Where("id = ? AND business_id = ? AND status = ? AND deleted_at IS NULL", heldSaleID, businessID, "held").
+		Updates(updates)
 	if result.Error != nil {
 		return result.Error
 	}
 	if result.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
+		return ErrHeldSaleNotHeld
 	}
 	return nil
 }

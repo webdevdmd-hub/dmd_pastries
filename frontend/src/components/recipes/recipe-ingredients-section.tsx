@@ -5,6 +5,7 @@ import type { JSX } from "react";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
+import { useConfirm } from "@/components/app/confirm-provider";
 import { RecipeIngredientLineEditor } from "@/components/recipes/recipe-ingredient-line-editor";
 import { RecipeIngredientTable } from "@/components/recipes/recipe-ingredient-table";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ import {
   useUpdateRecipeIngredient,
 } from "@/hooks/use-recipes";
 import { getErrorMessage } from "@/lib/api/client";
+import { recipeLineDeleteConfirmation } from "@/lib/catalog/delete-confirmations";
 import {
   isSelfReferencingRecipeLine,
   RECIPE_SELF_REFERENCE_MESSAGE,
@@ -86,6 +88,7 @@ export function RecipeIngredientsSection({
   const addMutation = useAddRecipeIngredient();
   const updateMutation = useUpdateRecipeIngredient();
   const deleteMutation = useDeleteRecipeIngredient();
+  const confirm = useConfirm();
   const lines = ingredientsQuery.data ?? [];
   const updatePreviewDraft = useCallback(
     (payload: RecipeIngredientPayload | null) => {
@@ -199,6 +202,11 @@ export function RecipeIngredientsSection({
     if (!recipeId) {
       return;
     }
+
+    // A draft line above is only local state; a saved one changes the
+    // recipe's cost, so it is asked about first (ISSUE-091).
+    const lineName = line.componentProductName ?? line.itemNameSnapshot;
+    if (!(await confirm(recipeLineDeleteConfirmation("ingredient", lineName)))) return;
 
     try {
       await deleteMutation.mutateAsync({ id: recipeId, lineId: line.id });

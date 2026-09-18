@@ -212,7 +212,7 @@ func main() {
 	expenseHandler := expenses.NewHandler(expenseService)
 	salesReturnService := salesreturns.NewService(db, salesReturnRepo, inventoryService, auditRepo, accountingService)
 	salesReturnHandler := salesreturns.NewHandler(salesReturnService)
-	superAdminService := superadmin.NewService(db)
+	superAdminService := superadmin.NewService(db, identities)
 
 	authMiddleware := middleware.NewAuthMiddleware(authService)
 	permissionMiddleware := middleware.NewPermissionMiddleware()

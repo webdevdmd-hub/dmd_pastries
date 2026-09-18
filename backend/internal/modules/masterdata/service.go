@@ -117,6 +117,38 @@ func (s *Service) ListUnits(currentUser *utils.AuthContext) ([]UnitResponse, err
 	return response, nil
 }
 
+// ListActiveUnits is the units a form may offer. "Deleting" a unit in Master
+// Data only marks it inactive, and the lookups endpoint used to hand back
+// ListUnits whole, so product forms kept offering deactivated units
+// (ISSUE-089). Master Data itself still lists every unit, so one can be
+// reactivated.
+func (s *Service) ListActiveUnits(currentUser *utils.AuthContext) ([]UnitResponse, error) {
+	units, err := s.ListUnits(currentUser)
+	if err != nil {
+		return nil, err
+	}
+	return activeOnly(units, func(unit UnitResponse) string { return unit.Status }), nil
+}
+
+// ListActiveProductCategories is ListActiveUnits for product categories.
+func (s *Service) ListActiveProductCategories(currentUser *utils.AuthContext, productType string) ([]ProductCategoryResponse, error) {
+	categories, err := s.ListProductCategories(currentUser, productType)
+	if err != nil {
+		return nil, err
+	}
+	return activeOnly(categories, func(category ProductCategoryResponse) string { return category.Status }), nil
+}
+
+func activeOnly[T any](records []T, status func(T) string) []T {
+	active := make([]T, 0, len(records))
+	for _, record := range records {
+		if status(record) == "active" {
+			active = append(active, record)
+		}
+	}
+	return active
+}
+
 func (s *Service) GetUnit(currentUser *utils.AuthContext, id string) (*UnitResponse, error) {
 	unit, err := s.repo.FindUnit(id, currentUser.BusinessID)
 	if err != nil {
@@ -840,6 +872,12 @@ func (s *Service) DeleteProductCategory(currentUser *utils.AuthContext, id strin
 	})
 }
 
+// simpleCategoryNameTaken refuses a duplicate ingredient or packaging category
+// name. The names are unique across the business, not per branch (see
+// Repository.SimpleNameExists), so the message says so: the clash may be in a
+// branch the person cannot see.
+const simpleCategoryNameTaken = "A category with this name already exists. Ingredient and packaging category names are shared by all branches, so choose a different name."
+
 func (s *Service) ListSimpleCategories(currentUser *utils.AuthContext, cfg simpleCategoryConfig) ([]SimpleCategoryResponse, error) {
 	branchID, err := currentUser.ResolveOperationalBranch("")
 	if err != nil {
@@ -877,7 +915,7 @@ func (s *Service) CreateSimpleCategory(currentUser *utils.AuthContext, cfg simpl
 		return nil, apperrors.Internal("failed to validate category name")
 	}
 	if exists {
-		return nil, apperrors.Conflict("category name already exists", nil)
+		return nil, apperrors.Conflict(simpleCategoryNameTaken, nil)
 	}
 
 	category := map[string]interface{}{
@@ -922,7 +960,7 @@ func (s *Service) UpdateSimpleCategory(currentUser *utils.AuthContext, cfg simpl
 			return nil, apperrors.Internal("failed to validate category name")
 		}
 		if exists {
-			return nil, apperrors.Conflict("category name already exists", nil)
+			return nil, apperrors.Conflict(simpleCategoryNameTaken, nil)
 		}
 		updates["category_name"] = name
 	}

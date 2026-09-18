@@ -702,10 +702,11 @@ func (s *Service) DeleteOrder(currentUser *utils.AuthContext, id, ipAddress, use
 		if historyCount > 0 {
 			return apperrors.Conflict("purchase order has finalized transactions and cannot be deleted. Use returns/corrections or duplicate as draft.", map[string]interface{}{"reason": "purchase_order_has_finalized_history"})
 		}
+		metadata := s.hardDeleteAuditMetadata(tx, currentUser.BusinessID, "purchase_order.hard_deleted", order.ID, order.SupplierID, order.TotalAmount)
 		if err := s.repo.HardDeleteOrder(tx, currentUser.BusinessID, order.ID); err != nil {
 			return err
 		}
-		return s.audit(tx, currentUser, "purchase_order.hard_deleted", order.ID, "Purchase order hard deleted", ipAddress, userAgent)
+		return s.auditWithMetadata(tx, currentUser, "purchase_order.hard_deleted", order.ID, "Purchase order "+order.PurchaseOrderNumber+" deleted", metadata, ipAddress, userAgent)
 	})
 }
 
@@ -1461,13 +1462,14 @@ func (s *Service) DeleteSupplierPayment(currentUser *utils.AuthContext, id strin
 		if payment.Status != "completed" {
 			return apperrors.BadRequest("only completed supplier payments can be deleted", nil)
 		}
+		metadata := s.hardDeleteAuditMetadata(tx, currentUser.BusinessID, "supplier_payment.deleted", payment.ID, payment.SupplierID, payment.Amount)
 		if err := s.rollbackSupplierPaymentImpact(tx, currentUser, payment); err != nil {
 			return err
 		}
 		if err := s.repo.HardDeleteSupplierPayment(tx, currentUser.BusinessID, payment.ID); err != nil {
 			return notFound(err, "supplier payment not found")
 		}
-		return s.audit(tx, currentUser, "supplier_payment.deleted", payment.ID, "Supplier payment hard deleted", ipAddress, userAgent)
+		return s.auditWithMetadata(tx, currentUser, "supplier_payment.deleted", payment.ID, "Supplier payment hard deleted", metadata, ipAddress, userAgent)
 	})
 }
 
@@ -1722,10 +1724,11 @@ func (s *Service) DeleteInvoice(currentUser *utils.AuthContext, id, ipAddress, u
 		if references > 0 {
 			return apperrors.Conflict("This draft bill is referenced by payments, receipts or returns, so it cannot be deleted.", map[string]interface{}{"reason": "purchase_invoice_has_history"})
 		}
+		metadata := s.hardDeleteAuditMetadata(tx, currentUser.BusinessID, "purchase_invoice.hard_deleted", invoice.ID, invoice.SupplierID, invoice.TotalAmount)
 		if err := s.repo.HardDeleteDraftInvoice(tx, currentUser.BusinessID, invoice.ID); err != nil {
 			return err
 		}
-		return s.audit(tx, currentUser, "purchase_invoice.hard_deleted", invoice.ID, "Draft purchase invoice "+invoice.InvoiceNumber+" deleted", ipAddress, userAgent)
+		return s.auditWithMetadata(tx, currentUser, "purchase_invoice.hard_deleted", invoice.ID, "Draft purchase invoice "+invoice.InvoiceNumber+" deleted", metadata, ipAddress, userAgent)
 	})
 }
 
@@ -4464,17 +4467,39 @@ func (s *Service) receiptResponse(businessID string, receipt PurchaseReceipt, in
 func (s *Service) audit(tx *gorm.DB, currentUser *utils.AuthContext, eventType, entityID, summary, ipAddress, userAgent string) error {
 	entityType := purchasingAuditEntityType(eventType)
 	metadata := s.purchasingAuditMetadata(tx, currentUser.BusinessID, entityType, entityID)
+	return s.auditWithMetadata(tx, currentUser, eventType, entityID, summary, audit.Metadata(metadata, nil), ipAddress, userAgent)
+}
+
+func (s *Service) auditWithMetadata(tx *gorm.DB, currentUser *utils.AuthContext, eventType, entityID, summary string, metadata map[string]interface{}, ipAddress, userAgent string) error {
 	return s.auditRepo.CreateActivity(tx, audit.ActivityInput{
 		BusinessID:  currentUser.BusinessID,
 		ActorUserID: currentUser.UserID,
 		EventType:   eventType,
-		EntityType:  entityType,
+		EntityType:  purchasingAuditEntityType(eventType),
 		EntityID:    entityID,
 		Summary:     summary,
-		Metadata:    audit.Metadata(metadata, nil),
+		Metadata:    metadata,
 		IPAddress:   ipAddress,
 		UserAgent:   userAgent,
 	})
+}
+
+// hardDeleteAuditMetadata describes a purchasing document that is about to be
+// hard-deleted, so it must be called BEFORE the delete. audit() looks the
+// record up afterwards, which for a hard delete finds nothing: the activity log
+// lost the reference, amount and supplier of every deleted supplier payment,
+// purchase order and draft bill (ISSUE-082).
+func (s *Service) hardDeleteAuditMetadata(tx *gorm.DB, businessID, eventType, entityID, supplierID string, amount float64) map[string]interface{} {
+	fields := s.purchasingAuditMetadata(tx, businessID, purchasingAuditEntityType(eventType), entityID)
+	var supplierName string
+	_ = tx.Table("suppliers").Select("supplier_name").Where("id = ? AND business_id = ?", supplierID, businessID).Scan(&supplierName).Error
+	fields["supplier_id"] = supplierID
+	fields["supplier_name"] = supplierName
+	fields["amount"] = roundMoney(amount)
+	label, _ := fields["document_number"].(string)
+	// The activity log labels a row by the first name it finds, and
+	// supplier_name comes before the document numbers; name the document.
+	return audit.RecordMetadata(first(label, supplierName), fields, nil)
 }
 
 func (s *Service) purchasingAuditMetadata(tx *gorm.DB, businessID, entityType, entityID string) map[string]interface{} {

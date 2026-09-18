@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+
+	"pastries-pos/internal/shared/utils"
 )
 
 type Repository struct {
@@ -48,6 +50,17 @@ func (r *Repository) Update(tx *gorm.DB, id, businessID, branchID string, update
 		return gorm.ErrRecordNotFound
 	}
 	return nil
+}
+
+// RetireVariants soft-deletes a deleted product's variants in the product's
+// own transaction (ISSUE-086). Left live, they kept their SKUs and barcodes
+// reserved -- variant uniqueness checks look at variants, not at whether the
+// parent still exists -- so the codes could never be used again.
+func (r *Repository) RetireVariants(tx *gorm.DB, businessID, productID string) error {
+	now := time.Now().UTC()
+	return tx.Table("product_variants").
+		Where("business_id = ? AND product_id = ? AND deleted_at IS NULL", businessID, productID).
+		Updates(map[string]interface{}{"status": "archived", "updated_at": now, "deleted_at": now}).Error
 }
 
 func (r *Repository) ProductHistoryReferences(businessID, branchID, productID string) ([]ProductHistoryReference, error) {
@@ -140,6 +153,28 @@ func (r *Repository) ProductHistoryReferences(businessID, branchID, productID st
 			query:     "SELECT COUNT(*) FROM packaging_usage_rules WHERE business_id = ? AND branch_id = ? AND product_id = ?",
 			args:      []interface{}{businessID, branchID, productID},
 		},
+		// Variant history (ISSUE-086). A variant's sale lines, order lines,
+		// recipes, batches and inventory rows all carry the parent product_id,
+		// so the checks above already count them. What they missed is the
+		// product -- or any of its variants -- used as a component of another
+		// product: recipe lines and production consumptions name it only by
+		// component_product_id.
+		{
+			reference: "recipe_components",
+			query: `SELECT
+				(SELECT COUNT(*) FROM recipe_ingredients ri JOIN recipes r ON r.id = ri.recipe_id
+					WHERE ri.business_id = ? AND ri.component_product_id = ? AND ri.deleted_at IS NULL AND r.deleted_at IS NULL)
+				+ (SELECT COUNT(*) FROM recipe_packaging rp JOIN recipes r ON r.id = rp.recipe_id
+					WHERE rp.business_id = ? AND rp.component_product_id = ? AND rp.deleted_at IS NULL AND r.deleted_at IS NULL)`,
+			args: []interface{}{businessID, productID, businessID, productID},
+		},
+		{
+			reference: "production_consumptions",
+			query: `SELECT
+				(SELECT COUNT(*) FROM production_ingredient_consumptions WHERE business_id = ? AND component_product_id = ?)
+				+ (SELECT COUNT(*) FROM production_packaging_consumptions WHERE business_id = ? AND component_product_id = ?)`,
+			args: []interface{}{businessID, productID, businessID, productID},
+		},
 	}
 
 	references := make([]ProductHistoryReference, 0)
@@ -200,12 +235,20 @@ func (r *Repository) FindPOSByLookup(businessID, branchID, field, value string) 
 	return &product, nil
 }
 
-func (r *Repository) NextProductCode(businessID, branchID string) (string, error) {
-	var count int64
-	if err := r.db.Model(&Product{}).Where("business_id = ? AND branch_id = ?", businessID, branchID).Count(&count).Error; err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("PRD-%06d", count+1), nil
+// NextProductCode issues the next PRD- code from every product the business
+// has ever had, soft-deleted ones included (ISSUE-086).
+//
+// It used to count live products and add one. A deleted product's code was
+// then handed to the next product, and once the count fell behind the highest
+// code in use the new code collided with a live one. MAX over the raw table
+// (utils.NextSequentialNumber) never goes backwards.
+//
+// The sequence is business-wide, not per branch: migration 000010's unique
+// index on (business_id, lower(product_code)) is still in place -- 000032
+// dropped a differently named index -- so a per-branch sequence would hand a
+// second branch codes the first already holds.
+func (r *Repository) NextProductCode(businessID, _ string) (string, error) {
+	return utils.NextSequentialNumber(r.db.Table("products").Where("business_id = ?", businessID), "product_code", "PRD-", 6)
 }
 
 func (r *Repository) ProductCodeExists(businessID, branchID, value, excludeID string) (bool, error) {

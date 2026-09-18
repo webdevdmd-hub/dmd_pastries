@@ -1,6 +1,7 @@
 package pos
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"pastries-pos/internal/shared/money"
@@ -538,17 +539,20 @@ func (s *Service) ResumeHeldSale(currentUser *utils.AuthContext, id, ipAddress, 
 		return nil, apperrors.Internal("failed to load held sale")
 	}
 	if heldSale.Status != "held" {
-		return nil, apperrors.BadRequest("only held sales can be resumed", nil)
+		return nil, errHeldSaleNoLongerHeld()
 	}
 	if err := currentUser.EnsureRecordBranch(heldSale.BranchID); err != nil {
 		return nil, err
 	}
 	now := time.Now().UTC()
-	if err := s.repo.UpdateHeldSale(tx, currentUser.BusinessID, id, map[string]interface{}{
+	if err := s.repo.ReleaseHeldSale(tx, currentUser.BusinessID, id, map[string]interface{}{
 		"status":     "resumed",
 		"resumed_at": now,
 		"updated_at": now,
 	}); err != nil {
+		if errors.Is(err, ErrHeldSaleNotHeld) {
+			return nil, errHeldSaleNoLongerHeld()
+		}
 		return nil, apperrors.Internal("failed to resume held sale")
 	}
 	if err := s.writeAudit(tx, currentUser, "held_sale.resumed", id, "Held sale resumed.", ipAddress, userAgent); err != nil {
@@ -579,17 +583,20 @@ func (s *Service) CancelHeldSale(currentUser *utils.AuthContext, id, ipAddress, 
 		return apperrors.Internal("failed to load held sale")
 	}
 	if heldSale.Status != "held" {
-		return apperrors.BadRequest("only held sales can be cancelled", nil)
+		return errHeldSaleNoLongerHeld()
 	}
 	if err := currentUser.EnsureRecordBranch(heldSale.BranchID); err != nil {
 		return err
 	}
 	now := time.Now().UTC()
-	if err := s.repo.UpdateHeldSale(tx, currentUser.BusinessID, id, map[string]interface{}{
+	if err := s.repo.ReleaseHeldSale(tx, currentUser.BusinessID, id, map[string]interface{}{
 		"status":       "cancelled",
 		"cancelled_at": now,
 		"updated_at":   now,
 	}); err != nil {
+		if errors.Is(err, ErrHeldSaleNotHeld) {
+			return errHeldSaleNoLongerHeld()
+		}
 		return apperrors.Internal("failed to cancel held sale")
 	}
 	if err := s.writeAudit(tx, currentUser, "held_sale.cancelled", id, "Held sale cancelled.", ipAddress, userAgent); err != nil {
@@ -600,6 +607,13 @@ func (s *Service) CancelHeldSale(currentUser *utils.AuthContext, id, ipAddress, 
 	}
 	tx = nil
 	return nil
+}
+
+// errHeldSaleNoLongerHeld answers a resume or cancel of a sale that has
+// already left "held", whether that was seen on the read or lost on the
+// conditional write to a concurrent request. (ISSUE-096)
+func errHeldSaleNoLongerHeld() error {
+	return apperrors.Conflict("held sale was already resumed or cancelled; refresh the held sales list", nil)
 }
 
 func (s *Service) ListSales(currentUser *utils.AuthContext, query SalesListQuery) (*PaginatedResponse[SaleSummaryResponse], error) {

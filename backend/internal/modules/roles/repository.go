@@ -80,10 +80,13 @@ func (r *Repository) Delete(tx *gorm.DB, roleID string) error {
 	return tx.Delete(&Role{}, "id = ?", roleID).Error
 }
 
+// CountAssignedUsers counts the live staff holding the role. Deleted staff
+// still carry role_id for history; counting them blocked deleting a role the
+// Roles page showed with 0 users (ISSUE-076).
 func (r *Repository) CountAssignedUsers(roleID, businessID string) (int64, error) {
 	var count int64
 	err := r.db.Table("users").
-		Where("role_id = ? AND business_id = ?", roleID, businessID).
+		Where("role_id = ? AND business_id = ? AND deleted_at IS NULL", roleID, businessID).
 		Count(&count).Error
 	return count, err
 }

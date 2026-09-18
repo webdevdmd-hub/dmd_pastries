@@ -17,6 +17,7 @@ import { AccountingAccessDeniedCard } from "@/components/accounting/accounting-a
 import { ChartAccountDetailPanel } from "@/components/accounting/chart-account-detail-panel";
 import { ChartAccountFormDialog } from "@/components/accounting/chart-account-form-dialog";
 import { LedgerDetailsDrawer } from "@/components/accounting/ledger-details-drawer";
+import { useConfirm } from "@/components/app/confirm-provider";
 import { FilterField, FilterToolbar } from "@/components/shared/filter-toolbar";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
@@ -96,10 +97,7 @@ const accountTypes: { label: string; value: AccountingAccountType }[] = [
   { label: "Expense", value: "expense" },
 ];
 
-type PendingAction =
-  | { account: ChartAccount; type: "delete" }
-  | { account: ChartAccount; status: AccountingAccountStatus; type: "status" }
-  | null;
+type PendingAction = { account: ChartAccount; status: AccountingAccountStatus } | null;
 
 function formatAccountingLabel(value: string): string {
   return value
@@ -125,6 +123,7 @@ export function ChartOfAccountsPageClient(): JSX.Element {
   const [editingAccount, setEditingAccount] = useState<ChartAccount | null>(null);
   const [ledgerAccount, setLedgerAccount] = useState<ChartAccount | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+  const confirm = useConfirm();
   // Below lg the detail has no column to live in, so tapping a row opens it
   // over the list instead of parking it under a full page of accounts.
   const [detailOpen, setDetailOpen] = useState(false);
@@ -244,25 +243,44 @@ export function ChartOfAccountsPageClient(): JSX.Element {
     }
   };
 
-  const confirmAction = async (): Promise<void> => {
+  const confirmStatusChange = async (): Promise<void> => {
     if (!pendingAction) return;
 
     try {
-      if (pendingAction.type === "delete") {
-        await deleteMutation.mutateAsync(pendingAction.account.id);
-        toast.success("Chart account deleted.");
-        if (selectedAccountId === pendingAction.account.id) {
-          setSelectedAccountId("");
-        }
-      } else {
-        const updatedAccount = await statusMutation.mutateAsync({
-          id: pendingAction.account.id,
-          payload: { status: pendingAction.status },
-        });
-        toast.success("Chart account status updated.");
-        setSelectedAccountId(updatedAccount.id);
-      }
+      const updatedAccount = await statusMutation.mutateAsync({
+        id: pendingAction.account.id,
+        payload: { status: pendingAction.status },
+      });
+      toast.success("Chart account status updated.");
+      setSelectedAccountId(updatedAccount.id);
       setPendingAction(null);
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error));
+    }
+  };
+
+  const deleteAccount = async (account: ChartAccount): Promise<void> => {
+    // The server refuses an account anything still points at (ISSUE-077);
+    // the copy says so up front, and the refusal's own message says which.
+    const confirmed = await confirm({
+      cancelLabel: "Keep account",
+      confirmLabel: "Delete account",
+      consequence: `This removes ${account.accountCode} ${account.accountName} from the chart of accounts.`,
+      detail:
+        "An account with postings, child accounts, an account mapping or a payment account cannot be deleted. Deactivate it instead.",
+      title: "Delete this account?",
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await deleteMutation.mutateAsync(account.id);
+      toast.success("Chart account deleted.");
+      if (selectedAccountId === account.id) {
+        setSelectedAccountId("");
+      }
     } catch (error: unknown) {
       toast.error(getErrorMessage(error));
     }
@@ -299,7 +317,7 @@ export function ChartOfAccountsPageClient(): JSX.Element {
     ledgerPreview,
     onDelete: () => {
       setDetailOpen(false);
-      setPendingAction({ account, type: "delete" });
+      void deleteAccount(account);
     },
     onEdit: () => {
       setDetailOpen(false);
@@ -312,7 +330,6 @@ export function ChartOfAccountsPageClient(): JSX.Element {
       setPendingAction({
         account,
         status: account.status === "active" ? "inactive" : "active",
-        type: "status",
       });
     },
   });
@@ -629,7 +646,6 @@ export function ChartOfAccountsPageClient(): JSX.Element {
                             setPendingAction({
                               account: displayAccount,
                               status: displayAccount.status === "active" ? "inactive" : "active",
-                              type: "status",
                             });
                           }}
                         >
@@ -641,7 +657,7 @@ export function ChartOfAccountsPageClient(): JSX.Element {
                           disabled={displayAccount.isSystemAccount}
                           onClick={() => {
                             setDetailOpen(false);
-                            setPendingAction({ account: displayAccount, type: "delete" });
+                            void deleteAccount(displayAccount);
                           }}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -698,25 +714,19 @@ export function ChartOfAccountsPageClient(): JSX.Element {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {pendingAction?.type === "delete" ? "Delete account" : "Change account status"}
-            </DialogTitle>
-            <DialogDescription>
-              {pendingAction?.type === "delete"
-                ? "Only custom accounts without child accounts can be deleted. System accounts are protected."
-                : "System accounts cannot be deactivated."}
-            </DialogDescription>
+            <DialogTitle>Change account status</DialogTitle>
+            <DialogDescription>System accounts cannot be deactivated.</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button onClick={() => setPendingAction(null)} type="button" variant="outline">
-              Cancel
+              Keep status
             </Button>
             <Button
-              disabled={deleteMutation.isPending || statusMutation.isPending}
-              onClick={() => void confirmAction()}
+              disabled={statusMutation.isPending}
+              onClick={() => void confirmStatusChange()}
               type="button"
             >
-              Confirm
+              {pendingAction?.status === "inactive" ? "Deactivate account" : "Activate account"}
             </Button>
           </DialogFooter>
         </DialogContent>

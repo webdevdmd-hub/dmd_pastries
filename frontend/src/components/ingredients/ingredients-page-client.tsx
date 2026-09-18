@@ -6,6 +6,7 @@ import type { JSX } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { useConfirm } from "@/components/app/confirm-provider";
 import { AccessDeniedCard } from "@/components/ingredients/access-denied-card";
 import { IngredientFormDialog } from "@/components/ingredients/ingredient-form-dialog";
 import { IngredientsEmptyState } from "@/components/ingredients/ingredients-empty-state";
@@ -41,10 +42,7 @@ import {
 } from "@/hooks/use-ingredients";
 import { usePermission } from "@/hooks/use-permission";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
-import {
-  getHistoryDeleteConflictMessage,
-  isHistoryDeleteConflict,
-} from "@/lib/api/delete-conflicts";
+import { ingredientDeleteConfirmation } from "@/lib/catalog/delete-confirmations";
 import type {
   CreateIngredientPayload,
   Ingredient,
@@ -61,10 +59,7 @@ const defaultFilters: IngredientFilters = {
   supplierId: "all",
 };
 
-type PendingAction =
-  | { item: Ingredient; status: IngredientStatus; type: "status" }
-  | { item: Ingredient; type: "delete" }
-  | null;
+type PendingAction = { item: Ingredient; status: IngredientStatus; type: "status" } | null;
 
 export function IngredientsPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
@@ -87,6 +82,7 @@ export function IngredientsPageClient(): JSX.Element {
   const updateMutation = useUpdateIngredient();
   const statusMutation = useUpdateIngredientStatus();
   const deleteMutation = useDeleteIngredient();
+  const confirm = useConfirm();
   const isPermissionDenied =
     ingredientsQuery.error instanceof ApiError && ingredientsQuery.error.status === 403;
   // Every field in this toolbar is user-chosen, so every field counts. There is
@@ -127,24 +123,30 @@ export function IngredientsPageClient(): JSX.Element {
     if (!pendingAction) return;
 
     try {
-      if (pendingAction.type === "status") {
-        await statusMutation.mutateAsync({
-          id: pendingAction.item.id,
-          payload: { status: pendingAction.status },
-        });
-        toast.success("Ingredient status updated.");
-      } else {
-        await deleteMutation.mutateAsync(pendingAction.item.id);
-        toast.success("Ingredient deleted.");
-      }
+      await statusMutation.mutateAsync({
+        id: pendingAction.item.id,
+        payload: { status: pendingAction.status },
+      });
+      toast.success("Ingredient status updated.");
       setPendingAction(null);
     } catch (error) {
-      toast.error(
-        pendingAction.type === "delete" && isHistoryDeleteConflict(error)
-          ? getHistoryDeleteConflictMessage("ingredient")
-          : getErrorMessage(error),
-      );
+      toast.error(getErrorMessage(error));
       setPendingAction(null);
+    }
+  };
+
+  // The dialog said "soft-deletes the ingredient from active catalog
+  // workflows" -- nothing about the ingredient's inventory row, or what
+  // refuses the delete (ISSUE-083). The refusal is the server's own words,
+  // which name what is holding the ingredient.
+  const deleteItem = async (item: Ingredient): Promise<void> => {
+    if (!(await confirm(ingredientDeleteConfirmation(item.ingredientName)))) return;
+
+    try {
+      await deleteMutation.mutateAsync(item.id);
+      toast.success("Ingredient deleted.");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     }
   };
 
@@ -230,7 +232,9 @@ export function IngredientsPageClient(): JSX.Element {
             <IngredientsTable
               canManage={canManage}
               items={items}
-              onDelete={(item) => setPendingAction({ item, type: "delete" })}
+              onDelete={(item) => {
+                void deleteItem(item);
+              }}
               onEdit={(item) => {
                 setEditingItem(item);
                 setFormOpen(true);
@@ -262,13 +266,9 @@ export function IngredientsPageClient(): JSX.Element {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {pendingAction?.type === "delete" ? "Delete ingredient" : "Change ingredient status"}
-            </DialogTitle>
+            <DialogTitle>Change ingredient status</DialogTitle>
             <DialogDescription>
-              {pendingAction?.type === "delete"
-                ? "This soft-deletes the ingredient from active catalog workflows."
-                : `Update ${pendingAction?.item.ingredientName ?? "ingredient"} to ${pendingAction?.status ?? "status"}?`}
+              {`Update ${pendingAction?.item.ingredientName ?? "ingredient"} to ${pendingAction?.status ?? "status"}?`}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -276,7 +276,7 @@ export function IngredientsPageClient(): JSX.Element {
               Cancel
             </Button>
             <Button
-              disabled={statusMutation.isPending || deleteMutation.isPending}
+              disabled={statusMutation.isPending}
               onClick={() => {
                 void confirmAction();
               }}

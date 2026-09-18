@@ -883,14 +883,55 @@ func (s *Service) DeleteBatch(currentUser *utils.AuthContext, id, ipAddress, use
 		if err := currentUser.EnsureRecordBranch(batch.BranchID); err != nil {
 			return err
 		}
-		if batch.Status == "completed" {
-			return apperrors.BadRequest("completed batches cannot be deleted because stock movements already exist", nil)
+		if err := batchDeleteRefusal(batch.Status); err != nil {
+			return err
 		}
 		if err := s.repo.DeleteBatch(tx, id, currentUser.BusinessID); err != nil {
 			return err
 		}
+		released, err := s.repo.ReleaseBakeryOrders(tx, currentUser.BusinessID, id, currentUser.UserID)
+		if err != nil {
+			return err
+		}
+		for _, order := range released {
+			if err := s.auditRepo.CreateActivity(tx, audit.ActivityInput{
+				BusinessID:  currentUser.BusinessID,
+				ActorUserID: currentUser.UserID,
+				EventType:   "bakery_order.status_updated",
+				EntityType:  "bakery_order",
+				EntityID:    order.ID,
+				Summary:     "Production batch " + batch.ProductionBatchNumber + " deleted; order moved back to confirmed",
+				Metadata: audit.RecordMetadata(order.OrderNumber, map[string]interface{}{
+					"source_module":           "manufacturing",
+					"order_number":            order.OrderNumber,
+					"document_number":         order.OrderNumber,
+					"production_batch_number": batch.ProductionBatchNumber,
+				}, []audit.AuditChange{{Field: "order_status", Label: "Status", OldValue: "in_production", NewValue: "confirmed"}}),
+				IPAddress: ipAddress,
+				UserAgent: userAgent,
+			}); err != nil {
+				return err
+			}
+		}
 		return s.audit(tx, currentUser, "production_batch.deleted", id, "Production batch deleted", ipAddress, userAgent)
 	})
+}
+
+// batchDeleteRefusal allows deleting only what the screens offer to delete: a
+// draft or planned batch, which has moved no stock (ISSUE-090). The server
+// used to delete in-progress and cancelled batches too.
+func batchDeleteRefusal(status string) error {
+	details := map[string]interface{}{"reason": "batch_not_planned", "status": status}
+	switch status {
+	case "draft", "planned":
+		return nil
+	case "in_progress":
+		return apperrors.Conflict("This batch is in progress, so it cannot be deleted. Cancel it instead.", details)
+	case "completed":
+		return apperrors.Conflict("This batch is completed and has moved stock, so it cannot be deleted.", details)
+	default:
+		return apperrors.Conflict("This batch is cancelled and stays on record. Only a planned batch can be deleted.", details)
+	}
 }
 
 func (s *Service) ListIngredients(currentUser *utils.AuthContext, batchID string) ([]ProductionIngredientResponse, error) {

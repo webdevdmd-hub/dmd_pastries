@@ -153,12 +153,18 @@ export function PaymentAccountsPanel(): JSX.Element {
 
   const deleteAccount = async (account: PaymentAccount): Promise<void> => {
     setDetailsOpen(false);
-    // The one irreversible action here, so it asks first and names the row.
+    // A soft delete: the row is hidden, not destroyed, so the copy does not
+    // say "permanently". What it does take with it is the opening balance
+    // entry. The server refuses while a payment method uses the account,
+    // as its default or at a branch (ISSUE-079), and says which.
     const confirmed = await confirm({
       cancelLabel: "Keep account",
       confirmLabel: "Delete account",
-      consequence: `This permanently deletes ${account.accountName}. It cannot be undone.`,
-      detail: "Payment methods linked to it will need a new account before checkout can use them.",
+      consequence: account.openingJournalEntryId
+        ? `This removes ${account.accountName} and its opening balance entry. Payments already posted through it stay in the ledger.`
+        : `This removes ${account.accountName}. Payments already posted through it stay in the ledger.`,
+      detail:
+        "It cannot be deleted while a payment method uses it, as its default account or at a branch.",
       title: "Delete this payment account?",
     });
 

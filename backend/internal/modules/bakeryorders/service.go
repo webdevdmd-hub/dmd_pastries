@@ -162,9 +162,15 @@ func (s *Service) UpdateOrder(currentUser *utils.AuthContext, id string, req Upd
 		updates := map[string]interface{}{"updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}
 		if req.CustomerID != nil {
 			customerID := strings.TrimSpace(*req.CustomerID)
-			if customerID == "" {
+			switch {
+			case customerID == "":
 				updates["customer_id"] = nil
-			} else {
+			case order.CustomerID != nil && *order.CustomerID == customerID:
+				// The form resubmits the order's own customer on every save.
+				// It is not a new choice, so it need not be active: a customer
+				// with orders is retired by deactivating (ISSUE-087), and
+				// re-validating made every one of their orders uneditable.
+			default:
 				customer, err := s.validCustomer(tx, currentUser.BusinessID, order.BranchID, customerID)
 				if err != nil {
 					return err
@@ -451,10 +457,48 @@ func (s *Service) DeleteOrder(currentUser *utils.AuthContext, id, ipAddress, use
 		if order.AccountingJournalEntryID != nil && strings.TrimSpace(*order.AccountingJournalEntryID) != "" {
 			return apperrors.BadRequest("orders with posted accounting entries cannot be deleted; cancel the order instead", nil)
 		}
+		history, err := s.repo.LedgerHistory(tx, currentUser.BusinessID, order.ID)
+		if err != nil {
+			return apperrors.Internal("failed to check order stock and accounting history")
+		}
+		if err := bakeryOrderLedgerRefusal(order, history); err != nil {
+			return err
+		}
 		if err := s.repo.UpdateOrder(tx, id, currentUser.BusinessID, map[string]interface{}{"deleted_at": gorm.DeletedAt{Time: time.Now().UTC(), Valid: true}, "updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}); err != nil {
 			return err
 		}
 		return s.audit(tx, currentUser, "bakery_order.deleted", id, "Bakery order deleted", ipAddress, userAgent)
+	})
+}
+
+// bakeryOrderLedgerHistory counts what an order left in stock and the ledger
+// beyond its revenue journal and payments, which DeleteOrder checks already.
+type bakeryOrderLedgerHistory struct {
+	StockMovements int64
+	Journals       int64
+}
+
+// bakeryOrderLedgerRefusal returns the 409 for an order that moved stock or
+// posted cost of sales, or nil. A zero-total order posts no revenue journal,
+// so it used to pass every check once completed and cancelled, and deleting
+// it left its COGS journals and stock movements pointing at nothing
+// (ISSUE-097).
+func bakeryOrderLedgerRefusal(order *BakeryOrder, history bakeryOrderLedgerHistory) error {
+	linked := func(id *string) bool { return id != nil && strings.TrimSpace(*id) != "" }
+	if !linked(order.COGSJournalEntryID) && !linked(order.COGSReversalJournalID) && !linked(order.RevenueReversalJournalID) &&
+		history.Journals == 0 && history.StockMovements == 0 {
+		return nil
+	}
+	message := "This order has moved stock or posted cost of sales, so it cannot be deleted."
+	if order.OrderStatus == "cancelled" {
+		message += " It stays on record as cancelled."
+	} else {
+		message += " Cancel the order instead."
+	}
+	return apperrors.Conflict(message, map[string]interface{}{
+		"reason":          "bakery_order_has_ledger_history",
+		"stock_movements": history.StockMovements,
+		"journals":        history.Journals,
 	})
 }
 

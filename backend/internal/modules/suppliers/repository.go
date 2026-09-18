@@ -113,6 +113,29 @@ func (r *Repository) SupplierHistoryReferences(tx *gorm.DB, businessID, branchID
 	return references, nil
 }
 
+// ClearItemSupplier removes a supplier from the ingredients and packaging items
+// that name it as their supplier. Those forms resubmit the id, and the
+// ingredient and packaging repositories reject a deleted supplier with 404, so
+// a deleted supplier left every such item unsaveable (ISSUE-088). Only these
+// default-supplier links are cleared; purchasing documents keep theirs, and a
+// supplier with any is refused before deletion.
+func (r *Repository) ClearItemSupplier(tx *gorm.DB, businessID, supplierID string) (ingredients, packaging int64, err error) {
+	result := tx.Table("ingredients").
+		Where("business_id = ? AND supplier_id = ?", businessID, supplierID).
+		Updates(map[string]interface{}{"supplier_id": nil, "updated_at": time.Now().UTC()})
+	if result.Error != nil {
+		return 0, 0, result.Error
+	}
+	ingredients = result.RowsAffected
+	result = tx.Table("packaging_items").
+		Where("business_id = ? AND supplier_id = ?", businessID, supplierID).
+		Updates(map[string]interface{}{"supplier_id": nil, "updated_at": time.Now().UTC()})
+	if result.Error != nil {
+		return 0, 0, result.Error
+	}
+	return ingredients, result.RowsAffected, nil
+}
+
 func (r *Repository) Update(tx *gorm.DB, id, businessID, branchID string, updates map[string]interface{}) error {
 	result := tx.Model(&Supplier{}).Where("id = ? AND business_id = ? AND branch_id = ? AND deleted_at IS NULL", id, businessID, branchID).Updates(updates)
 	if result.Error != nil {

@@ -3,6 +3,7 @@
 import { Boxes, Pencil, Plus, Trash2 } from "lucide-react";
 import type { JSX } from "react";
 
+import { useConfirm } from "@/components/app/confirm-provider";
 import { ProductStatusBadge } from "@/components/products/product-status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { variantDeleteConfirmation } from "@/lib/catalog/delete-confirmations";
 import {
   getProductVariantPosVisibilityLabel,
   isPosSelectableProductVariant,
@@ -37,6 +39,17 @@ export function ProductVariantsSection({
   product,
   variants,
 }: ProductVariantsSectionProps): JSX.Element {
+  const confirm = useConfirm();
+
+  // Both the product drawer and the full product page render this section, so
+  // the question is asked here, once, before either page's delete runs. The
+  // trash button used to delete on one click (ISSUE-084).
+  const requestDelete = async (variant: ProductVariant): Promise<void> => {
+    if (await confirm(variantDeleteConfirmation(product.productName, variant.variantName))) {
+      onDelete(variant);
+    }
+  };
+
   return (
     <Card className="overflow-hidden">
       <CardHeader className="flex flex-row items-center justify-between gap-3 border-b border-brand-cappuccino/70 bg-card/60">
@@ -115,7 +128,9 @@ export function ProductVariantsSection({
                           </Button>
                           <Button
                             className="text-danger-text"
-                            onClick={() => onDelete(variant)}
+                            onClick={() => {
+                              void requestDelete(variant);
+                            }}
                             size="icon"
                             variant="outline"
                           >

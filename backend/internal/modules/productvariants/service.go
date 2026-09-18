@@ -7,18 +7,21 @@ import (
 	"gorm.io/gorm"
 
 	"pastries-pos/internal/modules/audit"
+	"pastries-pos/internal/modules/inventory"
+	"pastries-pos/internal/shared/deleteguard"
 	apperrors "pastries-pos/internal/shared/errors"
 	"pastries-pos/internal/shared/utils"
 )
 
 type Service struct {
-	db        *gorm.DB
-	repo      *Repository
-	auditRepo *audit.Repository
+	db            *gorm.DB
+	repo          *Repository
+	inventoryRepo *inventory.Repository
+	auditRepo     *audit.Repository
 }
 
 func NewService(db *gorm.DB, repo *Repository, auditRepo *audit.Repository) *Service {
-	return &Service{db: db, repo: repo, auditRepo: auditRepo}
+	return &Service{db: db, repo: repo, inventoryRepo: inventory.NewRepository(db), auditRepo: auditRepo}
 }
 
 func (s *Service) ListVariants(currentUser *utils.AuthContext, productID string) ([]VariantResponse, error) {
@@ -175,16 +178,45 @@ func (s *Service) UpdateVariantStatus(currentUser *utils.AuthContext, productID,
 	return s.GetVariant(currentUser, productID, variantID)
 }
 
+// DeleteVariant removes a variant nothing has used yet, together with its
+// inventory row.
+//
+// It used to soft-delete unconditionally (ISSUE-084): the variant's inventory
+// row stayed in the inventory list and the valuation, and sales, orders and
+// recipes that kept its id showed a blank variant name. A variant with any of
+// that is now refused with 409; it can be set to inactive instead.
 func (s *Service) DeleteVariant(currentUser *utils.AuthContext, productID, variantID string, ipAddress, userAgent string) error {
 	if err := s.ensureProduct(currentUser, productID); err != nil {
 		return err
 	}
+	variant, err := s.repo.FindByID(productID, variantID, currentUser.BusinessID)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return apperrors.NotFound("variant not found")
+		}
+		return apperrors.Internal("failed to load variant")
+	}
 	return s.updateWithAudit(currentUser, "product_variant.deleted", variantID, "Product variant deleted.", ipAddress, userAgent, func(tx *gorm.DB) error {
-		return s.repo.Update(tx, productID, variantID, currentUser.BusinessID, map[string]interface{}{
+		stock, err := s.inventoryRepo.StockUses(tx, currentUser.BusinessID, inventory.OwnedByProductVariant, variantID)
+		if err != nil {
+			return err
+		}
+		uses, err := s.repo.VariantUses(tx, currentUser.BusinessID, variantID)
+		if err != nil {
+			return err
+		}
+		if uses = append(uses, stock...); len(uses) > 0 {
+			return deleteguard.Conflict("product_variant_in_use", variant.VariantName, uses, "Set it to inactive instead; its records stay.")
+		}
+		now := time.Now().UTC()
+		if err := s.repo.Update(tx, productID, variantID, currentUser.BusinessID, map[string]interface{}{
 			"status":     "archived",
-			"updated_at": time.Now().UTC(),
-			"deleted_at": gorm.DeletedAt{Time: time.Now().UTC(), Valid: true},
-		})
+			"updated_at": now,
+			"deleted_at": gorm.DeletedAt{Time: now, Valid: true},
+		}); err != nil {
+			return err
+		}
+		return s.inventoryRepo.RetireInventoryRows(tx, currentUser.BusinessID, inventory.OwnedByProductVariant, variantID)
 	})
 }
 

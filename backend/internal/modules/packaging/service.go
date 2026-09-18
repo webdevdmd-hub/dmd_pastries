@@ -11,6 +11,7 @@ import (
 
 	"pastries-pos/internal/modules/audit"
 	"pastries-pos/internal/modules/inventory"
+	"pastries-pos/internal/shared/deleteguard"
 	apperrors "pastries-pos/internal/shared/errors"
 	"pastries-pos/internal/shared/utils"
 )
@@ -254,16 +255,43 @@ func (s *Service) Delete(currentUser *utils.AuthContext, id, ipAddress, userAgen
 	if err != nil {
 		return err
 	}
+	item, err := s.repo.FindByID(id, currentUser.BusinessID, branchID)
+	if err != nil {
+		return notFound(err, "packaging item not found")
+	}
+	// One rule for every catalogue item with an auto-created inventory row
+	// (ISSUE-083). Delete used to look only at usage rules, so the item's
+	// inventory row -- quantity, value and all -- stayed in the inventory
+	// list, the stock valuation and the low-stock alerts. Now stock history
+	// refuses the delete, and a row without any goes with the item.
 	return s.db.Transaction(func(tx *gorm.DB) error {
-		used, err := s.repo.HasUsageRules(tx, currentUser.BusinessID, id)
+		uses, err := s.inventoryRepo.StockUses(tx, currentUser.BusinessID, inventory.OwnedByPackaging, id)
 		if err != nil {
 			return err
 		}
-		if used {
-			return apperrors.BadRequest("packaging item is used in product packaging rules", nil)
+		hasRules, err := s.repo.HasUsageRules(tx, currentUser.BusinessID, id)
+		if err != nil {
+			return err
 		}
-		if err := s.repo.Update(tx, id, currentUser.BusinessID, branchID, map[string]interface{}{"status": "inactive", "deleted_at": gorm.DeletedAt{Time: time.Now().UTC(), Valid: true}, "updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}); err != nil {
+		if hasRules {
+			uses = append(uses, "product packaging rules")
+		}
+		inRecipes, err := s.repo.UsedInRecipes(tx, currentUser.BusinessID, id)
+		if err != nil {
+			return err
+		}
+		if inRecipes {
+			uses = append(uses, "recipes using it")
+		}
+		if len(uses) > 0 {
+			return deleteguard.Conflict("packaging_item_in_use", item.PackagingName, uses, "Deactivate it instead; its records stay.")
+		}
+		now := time.Now().UTC()
+		if err := s.repo.Update(tx, id, currentUser.BusinessID, branchID, map[string]interface{}{"status": "inactive", "deleted_at": gorm.DeletedAt{Time: now, Valid: true}, "updated_by_user_id": currentUser.UserID, "updated_at": now}); err != nil {
 			return notFound(err, "packaging item not found")
+		}
+		if err := s.inventoryRepo.RetireInventoryRows(tx, currentUser.BusinessID, inventory.OwnedByPackaging, id); err != nil {
+			return err
 		}
 		return s.audit(tx, currentUser, "packaging.deleted", id, "Packaging item deleted", ipAddress, userAgent)
 	})

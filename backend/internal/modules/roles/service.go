@@ -375,6 +375,13 @@ func (s *Service) DeleteRole(currentUser *utils.AuthContext, roleID string, ipAd
 		})
 	}
 
+	// A deleted role grants nothing, so its permission rows go; the audit
+	// entry keeps what it allowed, which was otherwise lost (ISSUE-076).
+	permissionKeys, err := s.repo.GetPermissionKeysByRoleID(roleID)
+	if err != nil {
+		return apperrors.Internal("failed to load role permissions")
+	}
+
 	tx := s.db.Begin()
 	if tx.Error != nil {
 		return apperrors.Internal("failed to start transaction")
@@ -390,7 +397,8 @@ func (s *Service) DeleteRole(currentUser *utils.AuthContext, roleID string, ipAd
 		return apperrors.Internal("failed to delete role")
 	}
 	if err := s.writeRoleAudit(tx, currentUser, "role.deleted", roleID, "Role deleted.", map[string]interface{}{
-		"role_name": role.RoleName,
+		"role_name":       role.RoleName,
+		"permission_keys": permissionKeys,
 	}, ipAddress, userAgent); err != nil {
 		tx.Rollback()
 		return err

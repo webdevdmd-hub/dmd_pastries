@@ -63,7 +63,7 @@ export function ExpenseActionsMenu({
               onSelect={() => onDelete(expense)}
             >
               <Trash2 className="mr-2 h-4 w-4" />
-              Delete permanently
+              Delete expense
             </DropdownMenuItem>
           </>
         ) : null}

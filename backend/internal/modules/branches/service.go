@@ -241,6 +241,11 @@ func (s *Service) UpdateBranch(currentUser *utils.AuthContext, branchID string, 
 		updates["timezone"] = strings.TrimSpace(req.Timezone)
 	}
 	if req.Status != "" {
+		if req.Status == "inactive" {
+			if err := s.ensureCanDeactivate(currentUser.BusinessID, branch); err != nil {
+				return nil, err
+			}
+		}
 		updates["status"] = req.Status
 	}
 	if req.IsDefault != nil {
@@ -286,6 +291,18 @@ func (s *Service) UpdateBranch(currentUser *utils.AuthContext, branchID string, 
 }
 
 func (s *Service) UpdateBranchStatus(currentUser *utils.AuthContext, branchID string, req UpdateBranchStatusRequest, ipAddress, userAgent string) (*BranchResponse, error) {
+	if req.Status == "inactive" {
+		branch, err := s.repo.FindByIDAndBusinessID(branchID, currentUser.BusinessID)
+		if err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return nil, apperrors.NotFound("branch not found")
+			}
+			return nil, apperrors.Internal("failed to fetch branch")
+		}
+		if err := s.ensureCanDeactivate(currentUser.BusinessID, branch); err != nil {
+			return nil, err
+		}
+	}
 	if err := s.repo.UpdateByBusinessID(branchID, currentUser.BusinessID, map[string]interface{}{
 		"status":     req.Status,
 		"updated_at": time.Now().UTC(),
@@ -306,6 +323,35 @@ func (s *Service) UpdateBranchStatus(currentUser *utils.AuthContext, branchID st
 	}
 	response := toBranchResponse(*updated)
 	return &response, nil
+}
+
+// ensureCanDeactivate refuses to mark inactive the business's default branch
+// or its last active branch (ISSUE-095). Both the status action and the edit
+// form (which also carries a status) come through here.
+func (s *Service) ensureCanDeactivate(businessID string, branch *Branch) error {
+	activeCount, err := s.repo.CountActiveByBusinessID(businessID)
+	if err != nil {
+		return apperrors.Internal("failed to count active branches")
+	}
+	return branchDeactivationRefusal(*branch, activeCount)
+}
+
+// branchDeactivationRefusal returns the 409 for deactivating a branch the
+// business cannot do without, or nil. Checkout, stock and staff limited to a
+// branch all stop working there once it is inactive, so the default branch
+// has to hand that role to another branch first, and the last active branch
+// cannot go at all.
+func branchDeactivationRefusal(branch Branch, activeCount int64) error {
+	if branch.Status != "active" {
+		return nil
+	}
+	if branch.IsDefault {
+		return apperrors.Conflict("This is the default branch. Make another branch the default before marking this one inactive.", map[string]interface{}{"reason": "branch_is_default"})
+	}
+	if activeCount <= 1 {
+		return apperrors.Conflict("This is the only active branch. Add or reactivate another branch before marking this one inactive.", map[string]interface{}{"reason": "last_active_branch"})
+	}
+	return nil
 }
 
 func (s *Service) writeAudit(currentUser *utils.AuthContext, eventType, referenceID, ipAddress, userAgent string) error {

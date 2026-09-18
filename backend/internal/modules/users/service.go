@@ -17,6 +17,7 @@ import (
 	"pastries-pos/internal/modules/businesses"
 	"pastries-pos/internal/modules/roles"
 	apperrors "pastries-pos/internal/shared/errors"
+	"pastries-pos/internal/shared/userhistory"
 	"pastries-pos/internal/shared/utils"
 )
 
@@ -809,53 +810,85 @@ func (s *Service) DeleteUser(currentUser *utils.AuthContext, userID string, ipAd
 		}
 	}
 
+	// Delete means the person is gone (ISSUE-075). It used to hide the row and
+	// ban the login for a hundred years, so the login kept the email and phone
+	// and the same person could never be added again. Now the login is always
+	// removed, and the staff record is erased too unless the business has to
+	// keep it: a sale, payment or other record that names them.
+	hasHistory, err := userhistory.Has(s.db, user.ID)
+	if err != nil {
+		return nil, apperrors.Internal("failed to check the user's history")
+	}
+
 	tx := s.db.Begin()
 	if tx.Error != nil {
 		return nil, apperrors.Internal("failed to start transaction")
 	}
 
-	if err := s.repo.UpdateByBusinessIDTx(tx, user.ID, currentUser.BusinessID, map[string]interface{}{
-		"status":     "deleted",
-		"updated_at": time.Now().UTC(),
-	}); err != nil {
-		tx.Rollback()
-		return nil, err
+	erased := false
+	if !hasHistory {
+		// Falls back to keeping the record if a reference the history list does
+		// not know about still points at the user.
+		erased, err = s.repo.HardDeleteByBusinessID(tx, user.ID, currentUser.BusinessID)
+		if err != nil {
+			tx.Rollback()
+			return nil, err
+		}
+	}
+	if !erased {
+		if err := s.repo.UpdateByBusinessIDTx(tx, user.ID, currentUser.BusinessID, map[string]interface{}{
+			"status":     "deleted",
+			"updated_at": time.Now().UTC(),
+		}); err != nil {
+			tx.Rollback()
+			return nil, err
+		}
+		if err := s.repo.SoftDeleteByBusinessID(tx, user.ID, currentUser.BusinessID); err != nil {
+			tx.Rollback()
+			return nil, err
+		}
+		if err := s.repo.ClearProviderIDs(tx, user.ID); err != nil {
+			tx.Rollback()
+			return nil, apperrors.Internal("failed to unlink the user's login")
+		}
 	}
 
-	if err := s.repo.SoftDeleteByBusinessID(tx, user.ID, currentUser.BusinessID); err != nil {
-		tx.Rollback()
-		return nil, err
+	eventType, summary := "user.soft_deleted", "User deleted. Their login was removed; their name stays on the records they created."
+	if erased {
+		eventType, summary = "user.deleted", "User and their login were erased."
 	}
-
 	if err := s.auditRepo.CreateActivity(tx, audit.ActivityInput{
 		BusinessID:   currentUser.BusinessID,
 		ActorUserID:  currentUser.UserID,
 		TargetUserID: &user.ID,
-		EventType:    "user.soft_deleted",
+		EventType:    eventType,
 		EntityType:   "user",
 		EntityID:     user.ID,
-		Summary:      "User was soft-deleted.",
-		IPAddress:    ipAddress,
-		UserAgent:    userAgent,
+		Summary:      summary,
+		// The row may be gone, so the trail carries who it was.
+		Metadata:  map[string]interface{}{"full_name": user.FullName, "email": user.Email, "erased": erased, "login_removed": true},
+		IPAddress: ipAddress,
+		UserAgent: userAgent,
 	}); err != nil {
 		tx.Rollback()
 		return nil, apperrors.Internal("failed to create activity log")
+	}
+
+	// Remove the login before committing: if the identity provider refuses,
+	// nothing is deleted and the admin can simply try again. A login that is
+	// already gone counts as removed, so a retry after a failed commit works.
+	s.identities.RevokeSessions(user.ProviderIDs())
+	if err := s.identities.DeleteUser(user.ProviderIDs()); err != nil {
+		tx.Rollback()
+		return nil, apperrors.Internal("could not remove the user's login, so nothing was deleted; try again")
 	}
 
 	if err := tx.Commit().Error; err != nil {
 		return nil, apperrors.Internal("failed to commit user deletion")
 	}
 
-	s.identities.RevokeSessions(user.ProviderIDs())
-	_ = s.identities.SetUserStatus(user.ProviderIDs(), false)
-
-	deleted, err := s.repo.FindByIDAndBusinessIDUnscoped(user.ID, currentUser.BusinessID)
-	if err != nil {
-		return nil, apperrors.Internal("failed to reload deleted user")
-	}
-
-	deletedAt := deleted.DeletedAt.Time
-	return &DeleteUserResponse{ID: deleted.ID, Status: "deleted", DeletedAt: &deletedAt}, nil
+	deletedAt := time.Now().UTC()
+	return &DeleteUserResponse{ID: user.ID, Status: "deleted", DeletedAt: &deletedAt, Erased: erased}, nil
 }
 
 func (s *Service) RestoreUser(currentUser *utils.AuthContext, userID string, ipAddress, userAgent string) (*UserResponse, error) {
@@ -871,6 +904,11 @@ func (s *Service) RestoreUser(currentUser *utils.AuthContext, userID string, ipA
 	}
 	if err := s.ensureCanManageUser(currentUser, user); err != nil {
 		return nil, err
+	}
+	// Staff deleted since ISSUE-075 have no login left to wake; restoring the
+	// row alone would bring back someone who cannot sign in.
+	if !user.ProviderIDs().HasLogin() {
+		return nil, apperrors.Conflict("this user's login was removed when they were deleted; add them again with Create User or Invite", nil)
 	}
 
 	tx := s.db.Begin()

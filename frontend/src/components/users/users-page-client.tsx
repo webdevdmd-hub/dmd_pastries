@@ -545,8 +545,14 @@ export function UsersPageClient(): JSX.Element {
     }
 
     try {
-      await deleteUserMutation.mutateAsync(deleteDialogUser.id);
-      toast.success(`${deleteDialogUser.fullName} deleted successfully.`);
+      const result = await deleteUserMutation.mutateAsync(deleteDialogUser.id);
+      // Say which of the two things happened (ISSUE-075): erased outright, or
+      // kept on the records they created with their login removed.
+      toast.success(
+        result.erased
+          ? `${deleteDialogUser.fullName} was deleted.`
+          : `${deleteDialogUser.fullName} was deleted. Their name stays on the records they created.`,
+      );
       setDeleteDialogUser(null);
     } catch (mutationError) {
       toast.error(getErrorMessage(mutationError));
@@ -779,7 +785,7 @@ export function UsersPageClient(): JSX.Element {
             <DialogTitle>Delete staff user</DialogTitle>
             <DialogDescription>
               {deleteDialogUser
-                ? `Delete ${deleteDialogUser.fullName}? This removes the staff account from the active users list. Deactivate remains available when you only want to block access temporarily.`
+                ? `Delete ${deleteDialogUser.fullName}? Their login is removed, so they can no longer sign in and their email and phone can be used again. If they never recorded a sale, payment or other work, their account is erased; otherwise their name stays on those records. To block access for a while instead, deactivate them.`
                 : "Confirm staff user deletion."}
             </DialogDescription>
           </DialogHeader>

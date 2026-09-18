@@ -37,6 +37,7 @@ import {
   useUpdateRecipeStatus,
 } from "@/hooks/use-recipes";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
+import { recipeDeleteConsequence } from "@/lib/catalog/delete-confirmations";
 import type { Recipe, RecipeFilters, RecipeStatus } from "@/types/recipes";
 
 const defaultFilters: RecipeFilters = {
@@ -284,13 +285,13 @@ export function RecipesPageClient(): JSX.Element {
             </DialogTitle>
             <DialogDescription>
               {pendingAction?.type === "delete"
-                ? "This removes the recipe from active BOM workflows."
+                ? recipeDeleteConsequence(pendingAction.recipe.recipeName)
                 : `Update ${pendingAction?.recipe.recipeName ?? "recipe"} to ${pendingAction?.status ?? "status"}?`}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button onClick={() => setPendingAction(null)} type="button" variant="outline">
-              Cancel
+              {pendingAction?.type === "delete" ? "Keep recipe" : "Cancel"}
             </Button>
             <Button
               disabled={statusMutation.isPending || deleteMutation.isPending}
@@ -299,7 +300,7 @@ export function RecipesPageClient(): JSX.Element {
               }}
               type="button"
             >
-              Confirm
+              {pendingAction?.type === "delete" ? "Delete recipe" : "Confirm"}
             </Button>
           </DialogFooter>
         </DialogContent>

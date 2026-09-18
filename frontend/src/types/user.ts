@@ -92,6 +92,8 @@ export type SoftDeleteUserResult = {
   id: string;
   status: DeletedUserStatus;
   deletedAt: string;
+  /** The staff record was removed too, not just hidden: they left no history. */
+  erased: boolean;
 };
 
 export type UserFormMode = "create" | "edit";

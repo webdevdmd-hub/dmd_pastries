@@ -5,6 +5,7 @@ import type { JSX } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { useConfirm } from "@/components/app/confirm-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -16,8 +17,9 @@ import {
   usePackagingUsage,
 } from "@/hooks/use-packaging";
 import { getErrorMessage } from "@/lib/api/client";
+import { packagingRuleDeleteConfirmation } from "@/lib/catalog/delete-confirmations";
 import { createPackagingUsageSchema } from "@/lib/validators/packaging.schema";
-import type { PackagingItem } from "@/types/packaging";
+import type { PackagingItem, PackagingUsageRule } from "@/types/packaging";
 
 type PackagingUsageSectionProps = {
   canManage: boolean;
@@ -35,6 +37,7 @@ export function PackagingUsageSection({
   const usageQuery = usePackagingUsage(activeProductId, activeProductId.length > 0);
   const createMutation = useCreatePackagingUsage();
   const deleteMutation = useDeletePackagingUsage();
+  const confirm = useConfirm();
   const rules = usageQuery.data ?? [];
   const duplicateRule = rules.some((rule) => rule.packagingItemId === item.id);
 
@@ -69,6 +72,20 @@ export function PackagingUsageSection({
       toast.success("Packaging usage rule created.");
       setQuantityRequired("1");
       setIsDefault(false);
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
+  };
+
+  // The trash button fired the delete and dropped the promise: no question,
+  // no success message, and a failure vanished silently (ISSUE-094).
+  const deleteRule = async (rule: PackagingUsageRule): Promise<void> => {
+    const productName = rule.productName || "this product";
+    if (!(await confirm(packagingRuleDeleteConfirmation(rule.packagingName, productName)))) return;
+
+    try {
+      await deleteMutation.mutateAsync({ productId: activeProductId, ruleId: rule.id });
+      toast.success("Packaging usage rule deleted.");
     } catch (error) {
       toast.error(getErrorMessage(error));
     }
@@ -161,10 +178,7 @@ export function PackagingUsageSection({
                   aria-label="Delete packaging usage rule"
                   disabled={deleteMutation.isPending}
                   onClick={() => {
-                    void deleteMutation.mutateAsync({
-                      productId: activeProductId,
-                      ruleId: rule.id,
-                    });
+                    void deleteRule(rule);
                   }}
                   size="icon"
                   type="button"

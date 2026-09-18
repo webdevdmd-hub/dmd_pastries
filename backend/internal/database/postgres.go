@@ -182,6 +182,7 @@ func VerifySchema(db *gorm.DB) error {
 		"purchase_receipt_items",
 		"purchase_returns",
 		"purchase_return_items",
+		"document_number_counters",
 		"packaging_items",
 		"packaging_usage_rules",
 		"recipes",

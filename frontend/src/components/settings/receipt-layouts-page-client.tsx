@@ -654,7 +654,8 @@ export function ReceiptLayoutsPageClient(): JSX.Element {
     const confirmed = await confirm({
       cancelLabel: "Keep layout",
       confirmLabel: "Delete layout",
-      consequence: `This permanently deletes ${layout.layoutName}. It cannot be undone.`,
+      // A soft delete, so it is not described as permanent.
+      consequence: `This removes ${layout.layoutName} from your receipt layouts.`,
       detail: layout.isDefault
         ? "It is the default for its scope, so receipts there fall back to the business-wide layout."
         : "Receipts using it fall back to the default layout for their scope.",

@@ -2061,7 +2061,7 @@ func bakeryOrdersProductionScheduleSQL(filter *shared.ResolvedFilter) (string, [
 			pb.status AS production_batch_status,
 			CASE
 				WHEN bop.id IS NULL THEN 'No production record linked or created for this order item.'
-				WHEN bop.production_batch_id IS NULL THEN 'Production record exists without a linked batch.'
+				WHEN pb.id IS NULL THEN 'Production record exists without a linked batch.'
 				WHEN bop.status = 'completed' THEN 'Production completed and linked to batch.'
 				WHEN bop.status = 'in_progress' THEN 'Production in progress and linked to batch.'
 				WHEN bop.status = 'assigned' THEN 'Production assigned to batch.'
@@ -2085,7 +2085,8 @@ func bakeryOrdersProductionScheduleSQL(filter *shared.ResolvedFilter) (string, [
 			ORDER BY CASE WHEN bop.bakery_order_item_id = boi.id THEN 0 ELSE 1 END, bop.created_at ASC
 			LIMIT 1
 		) bop ON true
-		LEFT JOIN production_batches pb ON pb.id = bop.production_batch_id AND pb.business_id = bo.business_id
+		-- A deleted batch is not a linked batch (ISSUE-090).
+		LEFT JOIN production_batches pb ON pb.id = bop.production_batch_id AND pb.business_id = bo.business_id AND pb.deleted_at IS NULL
 		WHERE bo.business_id = ? AND bo.event_date >= ? AND bo.event_date <= ? AND bo.deleted_at IS NULL`
 	args := []interface{}{filter.BusinessID, filter.DateFrom.Format("2006-01-02"), filter.DateTo.Format("2006-01-02")}
 	query, args = addBakeryOrderStatusSetFilter(query, args, productionScheduleBakeryOrderStatuses)

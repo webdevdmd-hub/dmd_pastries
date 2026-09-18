@@ -56,6 +56,60 @@ func (r *Repository) DeleteBatch(tx *gorm.DB, id, businessID string) error {
 	return updateOne(tx.Model(&ProductionBatch{}).Where("id = ? AND business_id = ? AND deleted_at IS NULL", id, businessID).Update("deleted_at", gorm.Expr("now()")))
 }
 
+// releasedBakeryOrder is a bakery order moved back to confirmed because the
+// batch that put it in production was deleted.
+type releasedBakeryOrder struct {
+	ID          string
+	OrderNumber string
+}
+
+// ReleaseBakeryOrders undoes, for a batch being deleted, what linking bakery
+// orders to it did (ISSUE-090). Deleting the batch used to leave the order's
+// production rows pointing at it and the order stuck in production.
+//
+// Creating a batch for a confirmed order is what moves the order to
+// in_production (bakeryorders CreateProductionFromItem), so an order goes back
+// to confirmed when this batch was its only live batch and nobody marked its
+// production in progress or completed by hand. That runs first, because the
+// link it reads is what the second statement removes: the order's production
+// rows let go of the batch, and an "assigned" row is pending again.
+func (r *Repository) ReleaseBakeryOrders(tx *gorm.DB, businessID, batchID, userID string) ([]releasedBakeryOrder, error) {
+	var released []releasedBakeryOrder
+	if err := tx.Raw(`
+		UPDATE bakery_orders bo
+		SET order_status = 'confirmed', updated_by_user_id = ?, updated_at = now()
+		WHERE bo.business_id = ?
+			AND bo.deleted_at IS NULL
+			AND bo.order_status = 'in_production'
+			AND EXISTS (
+				SELECT 1 FROM bakery_order_productions link
+				WHERE link.business_id = bo.business_id
+					AND link.bakery_order_id = bo.id
+					AND link.production_batch_id = ?
+			)
+			AND NOT EXISTS (
+				SELECT 1 FROM bakery_order_productions other
+				LEFT JOIN production_batches pb ON pb.id = other.production_batch_id AND pb.deleted_at IS NULL
+				WHERE other.business_id = bo.business_id
+					AND other.bakery_order_id = bo.id
+					AND ((other.production_batch_id <> ? AND pb.id IS NOT NULL) OR other.status IN ('in_progress', 'completed'))
+			)
+		RETURNING bo.id, bo.order_number`,
+		userID, businessID, batchID, batchID).Scan(&released).Error; err != nil {
+		return nil, err
+	}
+	if err := tx.Exec(`
+		UPDATE bakery_order_productions
+		SET production_batch_id = NULL,
+			status = CASE WHEN status = 'assigned' THEN 'pending' ELSE status END,
+			updated_at = now()
+		WHERE business_id = ? AND production_batch_id = ?`,
+		businessID, batchID).Error; err != nil {
+		return nil, err
+	}
+	return released, nil
+}
+
 func (r *Repository) ListBatches(businessID string, query BatchListQuery) ([]ProductionBatch, int64, error) {
 	db := r.db.Model(&ProductionBatch{}).Where("production_batches.business_id = ? AND production_batches.deleted_at IS NULL", businessID)
 	db = applyFilters(db, query)

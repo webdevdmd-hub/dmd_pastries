@@ -2,6 +2,7 @@ package customers
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -306,6 +307,13 @@ func (s *Service) DeleteCustomer(currentUser *utils.AuthContext, id, ipAddress, 
 		return apperrors.Internal("failed to load customer")
 	}
 	return s.withTransaction(func(tx *gorm.DB) error {
+		history, err := s.repo.DeleteHistory(tx, currentUser.BusinessID, id)
+		if err != nil {
+			return apperrors.Internal("failed to check customer history")
+		}
+		if err := customerDeleteRefusal(history); err != nil {
+			return err
+		}
 		if err := s.repo.Update(tx, id, currentUser.BusinessID, branchID, map[string]interface{}{
 			"status":             "inactive",
 			"updated_by_user_id": currentUser.UserID,
@@ -316,6 +324,67 @@ func (s *Service) DeleteCustomer(currentUser *utils.AuthContext, id, ipAddress, 
 		}
 		return s.writeAudit(tx, currentUser, "customer.deleted", id, "Customer deleted.", ipAddress, userAgent)
 	})
+}
+
+// customerHistory counts what still points at a customer. Anything here keeps
+// the customer from being deleted (ISSUE-087): a deleted customer's bakery
+// orders and expenses fail to save with "customer not found", and their store
+// credit can no longer be chosen at the till.
+type customerHistory struct {
+	BakeryOrders    int64
+	Sales           int64
+	Expenses        int64
+	StoreCredit     int64 // credit rows with a balance left
+	OpeningBalances int64
+}
+
+// customerDeleteRefusal returns the 409 for a customer with history, naming
+// what they have, or nil when the customer can be deleted. Deactivating is the
+// way out: it hides the customer from new work and keeps every link intact.
+func customerDeleteRefusal(history customerHistory) error {
+	var has []string
+	if history.BakeryOrders > 0 {
+		has = append(has, countNoun(history.BakeryOrders, "bakery order"))
+	}
+	if history.Sales > 0 {
+		has = append(has, countNoun(history.Sales, "sale"))
+	}
+	if history.Expenses > 0 {
+		has = append(has, countNoun(history.Expenses, "expense"))
+	}
+	if history.StoreCredit > 0 {
+		has = append(has, "store credit")
+	}
+	if history.OpeningBalances > 0 {
+		has = append(has, "an opening balance")
+	}
+	if len(has) == 0 {
+		return nil
+	}
+	list := has[0]
+	if len(has) > 1 {
+		list = strings.Join(has[:len(has)-1], ", ") + " and " + has[len(has)-1]
+	}
+	message := "This customer has " + list + ", so it cannot be deleted. Deactivate the customer instead."
+	if history.StoreCredit > 0 {
+		// The till only offers active customers, so say what deactivating costs.
+		message += " While inactive, their store credit cannot be used at the till."
+	}
+	return apperrors.Conflict(message, map[string]interface{}{
+		"reason":           "customer_has_history",
+		"bakery_orders":    history.BakeryOrders,
+		"sales":            history.Sales,
+		"expenses":         history.Expenses,
+		"store_credit":     history.StoreCredit,
+		"opening_balances": history.OpeningBalances,
+	})
+}
+
+func countNoun(count int64, noun string) string {
+	if count == 1 {
+		return "1 " + noun
+	}
+	return strconv.FormatInt(count, 10) + " " + noun + "s"
 }
 
 func (s *Service) ListTags(currentUser *utils.AuthContext) ([]CustomerTagResponse, error) {

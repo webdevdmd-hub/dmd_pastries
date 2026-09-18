@@ -5,6 +5,7 @@ import type { JSX } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { useConfirm } from "@/components/app/confirm-provider";
 import { AccessDeniedCard } from "@/components/customers/access-denied-card";
 import { CustomerDetailsDrawer } from "@/components/customers/customer-details-drawer";
 import { CustomerFormDialog } from "@/components/customers/customer-form-dialog";
@@ -54,10 +55,7 @@ const defaultFilters: CustomerFilters = {
   dateTo: "",
 };
 
-type PendingAction =
-  | { type: "status"; customer: Customer; status: CustomerStatus }
-  | { type: "delete"; customer: Customer }
-  | null;
+type PendingAction = { type: "status"; customer: Customer; status: CustomerStatus } | null;
 
 export function CustomersPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
@@ -78,6 +76,7 @@ export function CustomersPageClient(): JSX.Element {
   const [detailsCustomerId, setDetailsCustomerId] = useState<string | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+  const confirm = useConfirm();
   const customersQuery = useCustomers(filters, canView);
   const tagsQuery = useCustomerTags(canView);
   const createMutation = useCreateCustomer();
@@ -146,18 +145,59 @@ export function CustomersPageClient(): JSX.Element {
     }
 
     try {
-      if (pendingAction.type === "status") {
-        await statusMutation.mutateAsync({
-          id: pendingAction.customer.id,
-          payload: { status: pendingAction.status },
-        });
-        toast.success("Customer status updated.");
-      } else {
-        await deleteMutation.mutateAsync(pendingAction.customer.id);
-        toast.success("Customer deleted.");
-      }
+      await statusMutation.mutateAsync({
+        id: pendingAction.customer.id,
+        payload: { status: pendingAction.status },
+      });
+      toast.success("Customer status updated.");
       setPendingAction(null);
     } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
+  };
+
+  // The server refuses (409) to delete a customer who still has bakery orders,
+  // sales, expenses, store credit or an opening balance: deleting them used to
+  // break every one of those records (ISSUE-087). The refusal names what the
+  // customer has, and the way out is deactivating, so it is offered right here.
+  const deleteCustomer = async (customer: Customer): Promise<void> => {
+    const confirmed = await confirm({
+      cancelLabel: "Keep customer",
+      confirmLabel: "Delete customer",
+      consequence: `This removes ${customer.fullName} from your customer list, lookups and the till.`,
+      detail:
+        "A customer with orders, sales, expenses, store credit or an opening balance cannot be deleted. Deactivate them instead.",
+      title: `Delete ${customer.fullName}?`,
+      tone: "danger",
+    });
+    if (!confirmed) {
+      return;
+    }
+    try {
+      await deleteMutation.mutateAsync(customer.id);
+      toast.success("Customer deleted.");
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409 && customer.status !== "inactive") {
+        const deactivate = await confirm({
+          cancelLabel: "Leave as is",
+          confirmLabel: "Deactivate customer",
+          consequence: error.message,
+          detail:
+            "Deactivating hides the customer from new sales and orders and keeps their history linked.",
+          title: `${customer.fullName} cannot be deleted`,
+          tone: "default",
+        });
+        if (!deactivate) {
+          return;
+        }
+        try {
+          await statusMutation.mutateAsync({ id: customer.id, payload: { status: "inactive" } });
+          toast.success("Customer deactivated.");
+        } catch (statusError) {
+          toast.error(getErrorMessage(statusError));
+        }
+        return;
+      }
       toast.error(getErrorMessage(error));
     }
   };
@@ -166,7 +206,9 @@ export function CustomersPageClient(): JSX.Element {
   const listHandlers = {
     canManage,
     customers,
-    onDelete: (customer: Customer) => setPendingAction({ type: "delete", customer }),
+    onDelete: (customer: Customer) => {
+      void deleteCustomer(customer);
+    },
     onEdit: openEdit,
     onStatusChange: (customer: Customer, status: CustomerStatus) =>
       setPendingAction({ type: "status", customer, status }),
@@ -271,13 +313,9 @@ export function CustomersPageClient(): JSX.Element {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {pendingAction?.type === "delete" ? "Delete customer" : "Change customer status"}
-            </DialogTitle>
+            <DialogTitle>Change customer status</DialogTitle>
             <DialogDescription>
-              {pendingAction?.type === "delete"
-                ? "This soft-deletes the customer from active customer workflows."
-                : `Update ${pendingAction?.customer.fullName ?? "customer"} to ${pendingAction?.status ?? "status"}?`}
+              {`Update ${pendingAction?.customer.fullName ?? "customer"} to ${pendingAction?.status ?? "status"}?`}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -285,13 +323,13 @@ export function CustomersPageClient(): JSX.Element {
               Cancel
             </Button>
             <Button
-              disabled={statusMutation.isPending || deleteMutation.isPending}
+              disabled={statusMutation.isPending}
               onClick={() => {
                 void confirmAction();
               }}
               type="button"
             >
-              Confirm
+              Change status
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -159,6 +159,17 @@ func (r *Repository) UpdateTaxRate(tx *gorm.DB, id, businessID string, updates m
 	return nil
 }
 
+// CountProductsUsingTaxRate counts live products, in any branch and of any
+// status, assigned the rate. Product variants carry no tax rate of their
+// own; they sell at their product's. (ISSUE-078)
+func (r *Repository) CountProductsUsingTaxRate(businessID, taxRateID string) (int64, error) {
+	var count int64
+	err := r.db.Table("products").
+		Where("business_id = ? AND tax_rate_id = ? AND deleted_at IS NULL", businessID, taxRateID).
+		Count(&count).Error
+	return count, err
+}
+
 func (r *Repository) CountActiveTaxRates(businessID string) (int64, error) {
 	var count int64
 	err := r.db.Model(&TaxRate{}).Where("business_id = ? AND status = ? AND deleted_at IS NULL", businessID, "active").Count(&count).Error

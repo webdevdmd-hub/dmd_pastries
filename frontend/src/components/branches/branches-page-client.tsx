@@ -5,6 +5,7 @@ import type { JSX } from "react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { useConfirm } from "@/components/app/confirm-provider";
 import { BranchFormDialog } from "@/components/branches/branch-form-dialog";
 import { BranchesEmptyState } from "@/components/branches/branches-empty-state";
 import { BranchesErrorState } from "@/components/branches/branches-error-state";
@@ -58,6 +59,7 @@ export function BranchesPageClient(): JSX.Element {
   const createBranchMutation = useCreateBranch();
   const updateBranchMutation = useUpdateBranch();
   const updateBranchStatusMutation = useUpdateBranchStatus();
+  const confirm = useConfirm();
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
@@ -107,6 +109,22 @@ export function BranchesPageClient(): JSX.Element {
   };
 
   const handleStatusChange = async (branch: Branch, status: BranchStatus): Promise<void> => {
+    // Marking a branch inactive used to happen on one click (ISSUE-095). The
+    // server refuses the default and the last active branch; any other one
+    // stops trading, so say so before it happens.
+    if (status === "inactive") {
+      const confirmed = await confirm({
+        cancelLabel: "Keep active",
+        confirmLabel: "Mark inactive",
+        consequence: `Checkout stops at ${branch.name}, and staff who can only work at this branch can no longer sell or record stock there until it is marked active again.`,
+        detail: "Its sales, stock and records stay as they are.",
+        title: `Mark ${branch.name} inactive?`,
+        tone: "danger",
+      });
+      if (!confirmed) {
+        return;
+      }
+    }
     try {
       await updateBranchStatusMutation.mutateAsync({
         id: branch.id,

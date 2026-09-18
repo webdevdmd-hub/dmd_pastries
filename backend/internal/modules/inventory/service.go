@@ -318,17 +318,34 @@ func (s *Service) DeleteStockLocation(currentUser *utils.AuthContext, id, ipAddr
 	if err := currentUser.EnsureRecordBranch(location.BranchID); err != nil {
 		return err
 	}
-	if location.IsDefault {
-		return apperrors.BadRequest("cannot delete default location", nil)
-	}
-	hasStock, err := s.repo.StockLocationHasStock(s.db, currentUser.BusinessID, id)
-	if err != nil {
-		return err
-	}
-	if hasStock {
-		return apperrors.BadRequest("cannot delete location with stock", nil)
-	}
+	// Every check runs on the locked row inside the delete's transaction
+	// (ISSUE-085). The stock check used to run before the transaction opened,
+	// so stock arriving in between -- or a draft transfer completing later --
+	// landed on a location that was then deleted, and FindStockLocation, which
+	// skips deleted rows, could no longer find it to move the stock out.
+	// CompleteStockTransfer takes the same row lock.
 	return s.db.Transaction(func(tx *gorm.DB) error {
+		locked, err := s.repo.FindStockLocationForUpdate(tx, id, currentUser.BusinessID)
+		if err != nil {
+			return mapNotFound(err, "stock location not found")
+		}
+		if locked.IsDefault {
+			return apperrors.Conflict(locked.LocationName+" is the default stock location and cannot be deleted. Make another location the default first.", map[string]interface{}{"reason": "stock_location_default"})
+		}
+		hasStock, err := s.repo.StockLocationHasStock(tx, currentUser.BusinessID, id)
+		if err != nil {
+			return err
+		}
+		if hasStock {
+			return apperrors.Conflict(locked.LocationName+" still holds stock and cannot be deleted. Transfer or adjust its stock out first.", map[string]interface{}{"reason": "stock_location_has_stock"})
+		}
+		openTransfers, err := s.repo.StockLocationHasOpenTransfers(tx, currentUser.BusinessID, id)
+		if err != nil {
+			return err
+		}
+		if openTransfers {
+			return apperrors.Conflict(locked.LocationName+" is on a draft stock transfer and cannot be deleted. Complete or cancel the transfer first.", map[string]interface{}{"reason": "stock_location_has_open_transfers"})
+		}
 		if err := s.repo.DeleteStockLocation(tx, id, currentUser.BusinessID); err != nil {
 			return err
 		}
@@ -500,6 +517,9 @@ func (s *Service) CompleteStockTransfer(currentUser *utils.AuthContext, id, ipAd
 		if transfer.Status != "draft" {
 			return apperrors.BadRequest("only draft transfers can be completed", nil)
 		}
+		if err := s.lockTransferLocations(tx, currentUser.BusinessID, transfer); err != nil {
+			return err
+		}
 		source, err := s.repo.FindLocationBalanceForUpdate(tx, currentUser.BusinessID, transfer.InventoryItemID, transfer.FromStockLocationID)
 		if err != nil {
 			return mapNotFound(err, "source location has no stock balance")
@@ -583,6 +603,31 @@ func (s *Service) CompleteStockTransfer(currentUser *utils.AuthContext, id, ipAd
 		return nil
 	})
 	return response, err
+}
+
+// lockTransferLocations locks both ends of a transfer and refuses to complete
+// it when either location has been deleted since the draft was made
+// (ISSUE-085). Completion used to move the balances regardless, stranding the
+// stock on a location nothing can find. The lock is the one
+// DeleteStockLocation takes, so a delete and a completion cannot interleave;
+// taking the two in id order keeps concurrent completions from deadlocking.
+func (s *Service) lockTransferLocations(tx *gorm.DB, businessID string, transfer *StockTransfer) error {
+	ends := []struct{ id, role string }{
+		{transfer.FromStockLocationID, "source"},
+		{transfer.ToStockLocationID, "destination"},
+	}
+	if ends[1].id < ends[0].id {
+		ends[0], ends[1] = ends[1], ends[0]
+	}
+	for _, end := range ends {
+		if _, err := s.repo.FindStockLocationForUpdate(tx, end.id, businessID); err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return apperrors.Conflict("The "+end.role+" location of this transfer has been deleted, so it cannot be completed. Cancel it and create a new transfer.", map[string]interface{}{"reason": "stock_transfer_location_deleted"})
+			}
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Service) CancelStockTransfer(currentUser *utils.AuthContext, id, ipAddress, userAgent string) (*StockTransferResponse, error) {

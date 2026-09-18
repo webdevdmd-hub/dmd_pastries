@@ -121,6 +121,22 @@ func (r *Repository) DeletePackaging(tx *gorm.DB, id, recipeID, businessID, bran
 	return updateOne(tx.Model(&RecipePackaging{}).Where("id = ? AND recipe_id = ? AND business_id = ? AND branch_id = ? AND deleted_at IS NULL", id, recipeID, businessID, branchID).Update("deleted_at", gorm.DeletedAt{Time: time.Now().UTC(), Valid: true}))
 }
 
+// DeleteRecipeLines soft-deletes every live ingredient and packaging line of a
+// recipe, in the recipe delete's transaction (ISSUE-091). Left behind, the
+// lines of a deleted recipe kept counting as uses: an ingredient on one could
+// never be deleted, for a recipe nobody could see or edit.
+func (r *Repository) DeleteRecipeLines(tx *gorm.DB, recipeID, businessID, branchID string) error {
+	deletedAt := gorm.DeletedAt{Time: time.Now().UTC(), Valid: true}
+	if err := tx.Model(&RecipeIngredient{}).
+		Where("recipe_id = ? AND business_id = ? AND branch_id = ? AND deleted_at IS NULL", recipeID, businessID, branchID).
+		Update("deleted_at", deletedAt).Error; err != nil {
+		return err
+	}
+	return tx.Model(&RecipePackaging{}).
+		Where("recipe_id = ? AND business_id = ? AND branch_id = ? AND deleted_at IS NULL", recipeID, businessID, branchID).
+		Update("deleted_at", deletedAt).Error
+}
+
 func (r *Repository) DeactivateOtherActiveRecipes(tx *gorm.DB, businessID, branchID, productID string, productVariantID *string, exceptRecipeID string) error {
 	query := tx.Model(&Recipe{}).Where("business_id = ? AND branch_id = ? AND product_id = ? AND id <> ? AND deleted_at IS NULL", businessID, branchID, productID, exceptRecipeID)
 	if productVariantID != nil {

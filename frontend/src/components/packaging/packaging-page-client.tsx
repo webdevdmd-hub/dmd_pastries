@@ -6,6 +6,7 @@ import type { JSX } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { useConfirm } from "@/components/app/confirm-provider";
 import { AccessDeniedCard } from "@/components/packaging/access-denied-card";
 import { PackagingEmptyState } from "@/components/packaging/packaging-empty-state";
 import { PackagingErrorState } from "@/components/packaging/packaging-error-state";
@@ -41,10 +42,7 @@ import {
 } from "@/hooks/use-packaging";
 import { usePermission } from "@/hooks/use-permission";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
-import {
-  getHistoryDeleteConflictMessage,
-  isHistoryDeleteConflict,
-} from "@/lib/api/delete-conflicts";
+import { packagingDeleteConfirmation } from "@/lib/catalog/delete-confirmations";
 import type {
   CreatePackagingPayload,
   PackagingFilters,
@@ -61,10 +59,7 @@ const defaultFilters: PackagingFilters = {
   supplierId: "all",
 };
 
-type PendingAction =
-  | { item: PackagingItem; status: PackagingStatus; type: "status" }
-  | { item: PackagingItem; type: "delete" }
-  | null;
+type PendingAction = { item: PackagingItem; status: PackagingStatus; type: "status" } | null;
 
 export function PackagingPageClient(): JSX.Element {
   const { hasAnyPermission } = usePermission();
@@ -88,6 +83,7 @@ export function PackagingPageClient(): JSX.Element {
   const updateMutation = useUpdatePackaging();
   const statusMutation = useUpdatePackagingStatus();
   const deleteMutation = useDeletePackaging();
+  const confirm = useConfirm();
   const isPermissionDenied =
     packagingQuery.error instanceof ApiError && packagingQuery.error.status === 403;
   // Every field in this toolbar is user-chosen, so every field counts. There is
@@ -130,24 +126,30 @@ export function PackagingPageClient(): JSX.Element {
     }
 
     try {
-      if (pendingAction.type === "status") {
-        await statusMutation.mutateAsync({
-          id: pendingAction.item.id,
-          payload: { status: pendingAction.status },
-        });
-        toast.success("Packaging status updated.");
-      } else {
-        await deleteMutation.mutateAsync(pendingAction.item.id);
-        toast.success("Packaging item deleted.");
-      }
+      await statusMutation.mutateAsync({
+        id: pendingAction.item.id,
+        payload: { status: pendingAction.status },
+      });
+      toast.success("Packaging status updated.");
       setPendingAction(null);
     } catch (error) {
-      toast.error(
-        pendingAction.type === "delete" && isHistoryDeleteConflict(error)
-          ? getHistoryDeleteConflictMessage("packaging item")
-          : getErrorMessage(error),
-      );
+      toast.error(getErrorMessage(error));
       setPendingAction(null);
+    }
+  };
+
+  // The dialog said "soft-deletes the packaging item from active catalog
+  // workflows" while its inventory row stayed in stock valuation and
+  // low-stock alerts (ISSUE-083). The refusal is the server's own words,
+  // which name what is holding the item.
+  const deleteItem = async (item: PackagingItem): Promise<void> => {
+    if (!(await confirm(packagingDeleteConfirmation(item.packagingName)))) return;
+
+    try {
+      await deleteMutation.mutateAsync(item.id);
+      toast.success("Packaging item deleted.");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     }
   };
 
@@ -233,7 +235,9 @@ export function PackagingPageClient(): JSX.Element {
             <PackagingTable
               canManage={canManage}
               items={items}
-              onDelete={(item) => setPendingAction({ item, type: "delete" })}
+              onDelete={(item) => {
+                void deleteItem(item);
+              }}
               onEdit={(item) => {
                 setEditingItem(item);
                 setFormOpen(true);
@@ -265,15 +269,9 @@ export function PackagingPageClient(): JSX.Element {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {pendingAction?.type === "delete"
-                ? "Delete packaging item"
-                : "Change packaging status"}
-            </DialogTitle>
+            <DialogTitle>Change packaging status</DialogTitle>
             <DialogDescription>
-              {pendingAction?.type === "delete"
-                ? "This soft-deletes the packaging item from active catalog workflows."
-                : `Update ${pendingAction?.item.packagingName ?? "packaging item"} to ${pendingAction?.status ?? "status"}?`}
+              {`Update ${pendingAction?.item.packagingName ?? "packaging item"} to ${pendingAction?.status ?? "status"}?`}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -281,7 +279,7 @@ export function PackagingPageClient(): JSX.Element {
               Cancel
             </Button>
             <Button
-              disabled={statusMutation.isPending || deleteMutation.isPending}
+              disabled={statusMutation.isPending}
               onClick={() => {
                 void confirmAction();
               }}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"pastries-pos/internal/shared/money"
+	"strconv"
 	"strings"
 	"time"
 
@@ -383,6 +384,15 @@ func (r *Repository) HardDeleteOrder(tx *gorm.DB, businessID, orderID string) er
 	if err := tx.Unscoped().
 		Where("purchase_order_id = ? AND business_id = ?", orderID, businessID).
 		Delete(&PurchaseOrderItem{}).Error; err != nil {
+		return err
+	}
+	// Revisions are snapshots of this order's own edits and reference it with
+	// no ON DELETE rule, so a revised draft failed here with a foreign-key
+	// violation (ISSUE-092). The caller only gets this far for an order with
+	// no finalized history, so the revisions have nothing left to describe.
+	if err := tx.Unscoped().
+		Where("purchase_order_id = ? AND business_id = ?", orderID, businessID).
+		Delete(&PurchaseOrderRevision{}).Error; err != nil {
 		return err
 	}
 	return updateOne(tx.Unscoped().
@@ -1250,11 +1260,45 @@ func (r *Repository) StockLocationName(stockLocationID *string, businessID strin
 	return name
 }
 
+// NextNumber issues the next number in a purchasing sequence (PO-, PI-, PR-,
+// VC-), keyed by lockName.
+//
+// A draft order, bill, receipt or vendor credit is hard-deleted, so the table's
+// own MAX+1 handed a deleted draft's number to the next document -- a PO number
+// already sent to a supplier could come back on another order (ISSUE-082).
+// document_number_counters remembers the highest number ever issued, and the
+// next number is past both it and anything in the table (a hand-typed bill
+// number in the same format included).
 func (r *Repository) NextNumber(tx *gorm.DB, businessID, table, column, prefix, lockName string) (string, error) {
 	if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", businessID+":"+lockName).Error; err != nil {
 		return "", err
 	}
-	return utils.NextSequentialNumber(tx.Table(table).Where("business_id = ?", businessID), column, prefix+"-", 6)
+	fromTable, err := utils.NextSequentialNumber(tx.Table(table).Where("business_id = ?", businessID), column, prefix+"-", 6)
+	if err != nil {
+		return "", err
+	}
+	next, err := strconv.ParseInt(strings.TrimPrefix(fromTable, prefix+"-"), 10, 64)
+	if err != nil {
+		return "", fmt.Errorf("parse %s: %w", fromTable, err)
+	}
+	var lastIssued int64
+	if err := tx.Raw(
+		"SELECT COALESCE(MAX(last_number), 0) FROM document_number_counters WHERE business_id = ? AND sequence_key = ?",
+		businessID, lockName,
+	).Scan(&lastIssued).Error; err != nil {
+		return "", err
+	}
+	if lastIssued >= next {
+		next = lastIssued + 1
+	}
+	if err := tx.Exec(`INSERT INTO document_number_counters (business_id, sequence_key, last_number)
+		VALUES (?, ?, ?)
+		ON CONFLICT (business_id, sequence_key) DO UPDATE
+		SET last_number = GREATEST(document_number_counters.last_number, EXCLUDED.last_number), updated_at = now()`,
+		businessID, lockName, next).Error; err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s-%06d", prefix, next), nil
 }
 
 func (r *Repository) ValidateBranch(tx *gorm.DB, businessID, branchID string) error {

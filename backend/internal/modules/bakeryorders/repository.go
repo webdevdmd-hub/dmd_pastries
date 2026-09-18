@@ -246,6 +246,23 @@ func (r *Repository) MarkMovementReversed(tx *gorm.DB, businessID, movementID, r
 		Updates(map[string]interface{}{"is_reversed": true, "reversed_by_movement_id": reversalMovementID}).Error
 }
 
+// LedgerHistory counts the stock movements and the order-keyed journals
+// (revenue, COGS and their reversals) that point at an order. Payment
+// journals are keyed to the payment and covered by CountOrderPayments.
+func (r *Repository) LedgerHistory(tx *gorm.DB, businessID, orderID string) (bakeryOrderLedgerHistory, error) {
+	var history bakeryOrderLedgerHistory
+	if err := tx.Table("stock_movements").
+		Where("business_id = ? AND reference_id = ? AND reference_type IN ?", businessID, orderID, []string{"bakery_order", "bakery_order_cancelled"}).
+		Count(&history.StockMovements).Error; err != nil {
+		return history, err
+	}
+	err := tx.Table("journal_entries").
+		Where("business_id = ? AND source_id = ? AND source_type IN ? AND deleted_at IS NULL", businessID, orderID,
+			[]string{"bakery_order_revenue", "bakery_order_revenue_reversal", "bakery_order_cogs", "bakery_order_cogs_reversal"}).
+		Count(&history.Journals).Error
+	return history, err
+}
+
 func (r *Repository) CountOrderPayments(tx *gorm.DB, businessID, orderID string) (int64, error) {
 	var count int64
 	err := tx.Table("bakery_order_payments").
@@ -254,11 +271,19 @@ func (r *Repository) CountOrderPayments(tx *gorm.DB, businessID, orderID string)
 	return count, err
 }
 
+// An order's production rows read their batch only while it exists. A deleted
+// batch used to keep showing on the order (ISSUE-090); deleting one now also
+// unlinks it, and this covers links left by deletes made before that.
+const (
+	productionColumns   = "bop.id, bop.bakery_order_id, bop.bakery_order_item_id, pb.id AS production_batch_id, pb.production_batch_number, bop.status, bop.created_at, bop.updated_at"
+	productionBatchJoin = "LEFT JOIN production_batches pb ON pb.id = bop.production_batch_id AND pb.deleted_at IS NULL"
+)
+
 func (r *Repository) Production(businessID, orderID string) (*BakeryOrderProductionResponse, error) {
 	var row BakeryOrderProductionResponse
 	result := r.db.Table("bakery_order_productions bop").
-		Select("bop.id, bop.bakery_order_id, bop.bakery_order_item_id, bop.production_batch_id, pb.production_batch_number, bop.status, bop.created_at, bop.updated_at").
-		Joins("LEFT JOIN production_batches pb ON pb.id = bop.production_batch_id").
+		Select(productionColumns).
+		Joins(productionBatchJoin).
 		Where("bop.business_id = ? AND bop.bakery_order_id = ?", businessID, orderID).
 		Order("CASE WHEN bop.bakery_order_item_id IS NULL THEN 0 ELSE 1 END, bop.created_at ASC").
 		Limit(1).
@@ -275,8 +300,8 @@ func (r *Repository) Production(businessID, orderID string) (*BakeryOrderProduct
 func (r *Repository) Productions(businessID, orderID string) ([]BakeryOrderProductionResponse, error) {
 	var rows []BakeryOrderProductionResponse
 	err := r.db.Table("bakery_order_productions bop").
-		Select("bop.id, bop.bakery_order_id, bop.bakery_order_item_id, bop.production_batch_id, pb.production_batch_number, bop.status, bop.created_at, bop.updated_at").
-		Joins("LEFT JOIN production_batches pb ON pb.id = bop.production_batch_id").
+		Select(productionColumns).
+		Joins(productionBatchJoin).
 		Where("bop.business_id = ? AND bop.bakery_order_id = ?", businessID, orderID).
 		Order("bop.created_at ASC").
 		Scan(&rows).Error

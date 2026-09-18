@@ -5,6 +5,7 @@ import type { JSX } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { useConfirm } from "@/components/app/confirm-provider";
 import { EmptyState, FailedState } from "@/components/shared/collection-state";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +16,7 @@ import {
   useSupplierNotes,
 } from "@/hooks/use-suppliers";
 import { getErrorMessage } from "@/lib/api/client";
+import { notePreview } from "@/lib/notes/note-preview";
 import { createSupplierNoteSchema } from "@/lib/validators/supplier.schema";
 
 type SupplierNotesSectionProps = {
@@ -30,6 +32,7 @@ export function SupplierNotesSection({
   const notesQuery = useSupplierNotes(supplierId);
   const createMutation = useCreateSupplierNote();
   const deleteMutation = useDeleteSupplierNote();
+  const confirm = useConfirm();
 
   const createNote = async (): Promise<void> => {
     const parsed = createSupplierNoteSchema.safeParse({ note });
@@ -43,6 +46,27 @@ export function SupplierNotesSection({
       await createMutation.mutateAsync({ supplierId, payload: parsed.data });
       toast.success("Supplier note added.");
       setNote("");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
+  };
+
+  // One click used to delete the note with no confirmation, no confirmation
+  // toast, and a failure that vanished silently (ISSUE-093).
+  const deleteNote = async (noteId: string, text: string): Promise<void> => {
+    const confirmed = await confirm({
+      cancelLabel: "Keep note",
+      confirmLabel: "Delete note",
+      consequence: `This removes the note “${notePreview(text)}” from this supplier. The delete is kept in the audit log.`,
+      title: "Delete this note?",
+      tone: "danger",
+    });
+    if (!confirmed) {
+      return;
+    }
+    try {
+      await deleteMutation.mutateAsync({ supplierId, noteId });
+      toast.success("Supplier note deleted.");
     } catch (error) {
       toast.error(getErrorMessage(error));
     }
@@ -125,10 +149,7 @@ export function SupplierNotesSection({
                     aria-label="Delete note"
                     disabled={deleteMutation.isPending}
                     onClick={() => {
-                      void deleteMutation.mutateAsync({
-                        supplierId,
-                        noteId: supplierNote.id,
-                      });
+                      void deleteNote(supplierNote.id, supplierNote.note);
                     }}
                     size="icon"
                     type="button"

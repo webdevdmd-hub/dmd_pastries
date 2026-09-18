@@ -2,6 +2,7 @@ package settings
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -690,24 +691,43 @@ func (s *Service) SetDefaultSalesChannel(currentUser *utils.AuthContext, id stri
 }
 
 func (s *Service) DeleteSalesChannel(currentUser *utils.AuthContext, id string, ipAddress, userAgent string) error {
+	channel, err := s.repo.FindSalesChannel(id, currentUser.BusinessID)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return apperrors.NotFound("sales channel not found")
+		}
+		return apperrors.Internal("failed to fetch sales channel")
+	}
+	// A till sale with no channel chosen goes to the default, so deleting it
+	// would quietly move those sales to whichever channel sorts first. The
+	// settings screen already hides Delete for the default; the server now
+	// agrees with it.
+	if channel.IsDefault {
+		return apperrors.Conflict("sales channel is the default; make another channel the default before deleting it", nil)
+	}
 	tx := s.db.Begin()
 	if tx.Error != nil {
 		return apperrors.Internal("failed to start transaction")
 	}
-	updates := map[string]interface{}{"status": "inactive", "is_default": false, "updated_at": time.Now().UTC()}
+	// A real soft delete (ISSUE-080). Setting only the status left the row
+	// listed and its name taken after a dialog that said it was deleted.
+	// Sales and orders keep their channel name snapshot, and every lookup the
+	// till and order screens use already skips deleted rows.
+	now := time.Now().UTC()
+	updates := map[string]interface{}{"status": "inactive", "is_default": false, "updated_at": now, "deleted_at": gorm.DeletedAt{Time: now, Valid: true}}
 	if err := s.repo.UpdateSalesChannel(tx, id, currentUser.BusinessID, updates); err != nil {
 		tx.Rollback()
 		if err == gorm.ErrRecordNotFound {
 			return apperrors.NotFound("sales channel not found")
 		}
-		return apperrors.Internal("failed to deactivate sales channel")
+		return apperrors.Internal("failed to delete sales channel")
 	}
-	if err := s.writeSettingsAudit(tx, currentUser, "sales_channel.deleted", "sales_channel", id, "Sales channel deactivated.", ipAddress, userAgent); err != nil {
+	if err := s.writeSettingsAudit(tx, currentUser, "sales_channel.deleted", "sales_channel", id, "Sales channel deleted.", ipAddress, userAgent); err != nil {
 		tx.Rollback()
 		return err
 	}
 	if err := tx.Commit().Error; err != nil {
-		return apperrors.Internal("failed to commit sales channel deactivation")
+		return apperrors.Internal("failed to commit sales channel deletion")
 	}
 	return nil
 }
@@ -897,6 +917,11 @@ func (s *Service) UpdateTaxRateStatus(currentUser *utils.AuthContext, id string,
 		}
 		return nil, apperrors.Internal("failed to fetch tax rate")
 	}
+	if req.Status == "inactive" {
+		if err := s.ensureTaxRateUnused(currentUser.BusinessID, id); err != nil {
+			return nil, err
+		}
+	}
 	tx := s.db.Begin()
 	if tx.Error != nil {
 		return nil, apperrors.Internal("failed to start transaction")
@@ -937,6 +962,9 @@ func (s *Service) DeleteTaxRate(currentUser *utils.AuthContext, id string, ipAdd
 			return apperrors.NotFound("tax rate not found")
 		}
 		return apperrors.Internal("failed to fetch tax rate")
+	}
+	if err := s.ensureTaxRateUnused(currentUser.BusinessID, id); err != nil {
+		return err
 	}
 	tx := s.db.Begin()
 	if tx.Error != nil {
@@ -1411,6 +1439,26 @@ func paymentMethodChanges(existing PaymentMethod, updates map[string]interface{}
 		}
 	}
 	return changes
+}
+
+// ensureTaxRateUnused refuses to take a rate out of service while products
+// still carry it. The till only joins a product's rate while that rate is
+// active (pos/repository.go), so those products would ring up with no tax
+// at all. This covers the default rate too: nothing assigns the default to
+// a product implicitly, so the products that carry it are all there is to
+// protect. (ISSUE-078)
+func (s *Service) ensureTaxRateUnused(businessID, taxRateID string) error {
+	count, err := s.repo.CountProductsUsingTaxRate(businessID, taxRateID)
+	if err != nil {
+		return apperrors.Internal("failed to validate tax rate usage")
+	}
+	if count == 0 {
+		return nil
+	}
+	if count == 1 {
+		return apperrors.Conflict("1 product still uses this tax rate; move it to another tax rate before deactivating this one", nil)
+	}
+	return apperrors.Conflict(fmt.Sprintf("%d products still use this tax rate; move them to another tax rate before deactivating this one", count), nil)
 }
 
 func validateTaxType(taxType string) error {

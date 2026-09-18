@@ -301,6 +301,29 @@ func (r *Repository) DeleteNote(tx *gorm.DB, businessID, branchID, customerID, n
 	return nil
 }
 
+// DeleteHistory counts the records that still reference a customer, across
+// every branch of the business: an order or sale taken at another branch
+// breaks just the same when its customer is gone.
+func (r *Repository) DeleteHistory(tx *gorm.DB, businessID, customerID string) (customerHistory, error) {
+	var history customerHistory
+	counts := []struct {
+		target *int64
+		query  string
+	}{
+		{&history.BakeryOrders, `SELECT COUNT(*) FROM bakery_orders WHERE business_id = ? AND customer_id = ? AND deleted_at IS NULL`},
+		{&history.Sales, `SELECT COUNT(*) FROM sales WHERE business_id = ? AND customer_id = ? AND deleted_at IS NULL`},
+		{&history.Expenses, `SELECT COUNT(*) FROM expenses WHERE business_id = ? AND customer_id = ? AND deleted_at IS NULL`},
+		{&history.StoreCredit, `SELECT COUNT(*) FROM customer_credits WHERE business_id = ? AND customer_id = ? AND balance > 0 AND deleted_at IS NULL`},
+		{&history.OpeningBalances, `SELECT COUNT(*) FROM counterparty_opening_balances WHERE business_id = ? AND party_type = 'customer' AND party_id = ? AND deleted_at IS NULL`},
+	}
+	for _, count := range counts {
+		if err := tx.Raw(count.query, businessID, customerID).Scan(count.target).Error; err != nil {
+			return history, err
+		}
+	}
+	return history, nil
+}
+
 func (r *Repository) BasicStats(businessID, branchID, customerID string) (*CustomerBasicStats, error) {
 	full, err := r.Stats(businessID, branchID, customerID)
 	if err != nil {

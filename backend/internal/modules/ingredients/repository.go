@@ -107,15 +107,22 @@ func (r *Repository) ValidateUnit(tx *gorm.DB, businessID, id string) error {
 	return exists(tx.Table("units").Where("id = ? AND (business_id IS NULL OR business_id = ?) AND status = ? AND deleted_at IS NULL", id, businessID, "active"))
 }
 
-func (r *Repository) HasInventory(tx *gorm.DB, businessID, ingredientID string) (bool, error) {
+// UsedInRecipes reports whether a recipe that still exists uses the
+// ingredient, named directly or through its inventory row (older lines were
+// written either way).
+//
+// Lines of a deleted recipe do not count. Recipe delete used to leave its
+// lines live, and they went on refusing the ingredient's delete for a recipe
+// nobody could see (ISSUE-091); recipe delete now removes them, and this also
+// ignores the ones deleted recipes left behind before that.
+func (r *Repository) UsedInRecipes(tx *gorm.DB, businessID, ingredientID string) (bool, error) {
+	ownRows := tx.Table("inventory_items").Select("id").Where("business_id = ? AND ingredient_id = ?", businessID, ingredientID)
 	var count int64
-	err := tx.Table("inventory_items").Where("business_id = ? AND item_type = ? AND ingredient_id = ? AND deleted_at IS NULL", businessID, "ingredient", ingredientID).Count(&count).Error
-	return count > 0, err
-}
-
-func (r *Repository) HasRecipeLines(tx *gorm.DB, businessID, ingredientID string) (bool, error) {
-	var count int64
-	err := tx.Table("recipe_ingredients").Where("business_id = ? AND ingredient_id = ? AND deleted_at IS NULL", businessID, ingredientID).Count(&count).Error
+	err := tx.Table("recipe_ingredients ri").
+		Joins("JOIN recipes r ON r.id = ri.recipe_id").
+		Where("ri.business_id = ? AND ri.deleted_at IS NULL AND r.deleted_at IS NULL", businessID).
+		Where("(ri.ingredient_id = ? OR ri.inventory_item_id IN (?))", ingredientID, ownRows).
+		Count(&count).Error
 	return count > 0, err
 }
 

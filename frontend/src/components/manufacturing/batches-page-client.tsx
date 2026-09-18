@@ -503,7 +503,9 @@ export function BatchesPageClient(): JSX.Element {
           <DialogHeader>
             <DialogTitle>Delete planned production?</DialogTitle>
             <DialogDescription>
-              This production has not posted stock or accounting yet. Deleting it cannot be undone.
+              This production has not posted stock or accounting yet. A bakery order it was made for
+              is unlinked, and goes back to confirmed if this was its only production. Deleting it
+              cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

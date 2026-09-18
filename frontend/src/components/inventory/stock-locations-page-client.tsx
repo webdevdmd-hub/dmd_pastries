@@ -5,6 +5,7 @@ import type { JSX } from "react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { useConfirm } from "@/components/app/confirm-provider";
 import { AccessDeniedCard } from "@/components/inventory/access-denied-card";
 import { NoBranchScopeCard } from "@/components/shared/no-branch-scope-card";
 import { PageHeader } from "@/components/shared/page-header";
@@ -48,6 +49,7 @@ import {
 } from "@/hooks/use-inventory";
 import { usePermission } from "@/hooks/use-permission";
 import { getErrorMessage } from "@/lib/api/client";
+import { stockLocationDeleteConfirmation } from "@/lib/catalog/delete-confirmations";
 import type {
   InventoryStatus,
   StockLocation,
@@ -90,6 +92,7 @@ export function StockLocationsPageClient(): JSX.Element {
   const statusMutation = useUpdateStockLocationStatus();
   const defaultMutation = useSetDefaultStockLocation();
   const deleteMutation = useDeleteStockLocation();
+  const confirm = useConfirm();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingLocation, setEditingLocation] = useState<StockLocation | null>(null);
   const [form, setForm] = useState<StockLocationPayload>(initialForm);
@@ -168,7 +171,12 @@ export function StockLocationsPageClient(): JSX.Element {
     }
   };
 
+  // The trash button deleted on one click (ISSUE-085). Stock, a draft
+  // transfer or default status refuse the delete on the server; the toast
+  // shows its reason, which says what to do first.
   const handleDelete = async (location: StockLocation): Promise<void> => {
+    if (!(await confirm(stockLocationDeleteConfirmation(location.locationName)))) return;
+
     try {
       await deleteMutation.mutateAsync(location.id);
       toast.success("Stock location deleted.");

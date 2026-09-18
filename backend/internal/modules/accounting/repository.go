@@ -542,6 +542,60 @@ func (r *Repository) HasJournalLines(tx *gorm.DB, businessID, accountID string) 
 	return count > 0, err
 }
 
+// ChartAccountUsage is everything that still points at a chart account.
+// Deleting an account while any of it exists strands the reference: Trial
+// Balance drops the account while the P&L and Balance Sheet keep it, its
+// General Ledger 404s, and postings routed through a mapping or a payment
+// account fail. (ISSUE-077)
+type ChartAccountUsage struct {
+	JournalLines    int64
+	AccountMappings int64
+	PaymentAccounts int64
+	// PaymentMethodLinks counts payment methods that reach the account
+	// through a payment account, as their default or as a branch override.
+	PaymentMethodLinks int64
+}
+
+// ChartAccountUsage counts the live references to an account. Unlike
+// HasJournalLines, soft-deleted lines do not count here: they belong to
+// deleted journals, which no report reads.
+func (r *Repository) ChartAccountUsage(tx *gorm.DB, businessID, accountID string) (ChartAccountUsage, error) {
+	var usage ChartAccountUsage
+	if err := tx.Table("journal_entry_lines").
+		Where("business_id = ? AND account_id = ? AND deleted_at IS NULL", businessID, accountID).
+		Count(&usage.JournalLines).Error; err != nil {
+		return usage, err
+	}
+	if err := tx.Table("accounting_account_mappings").
+		Where("business_id = ? AND chart_account_id = ? AND deleted_at IS NULL", businessID, accountID).
+		Count(&usage.AccountMappings).Error; err != nil {
+		return usage, err
+	}
+	if err := tx.Table("payment_accounts").
+		Where("business_id = ? AND chart_account_id = ? AND deleted_at IS NULL", businessID, accountID).
+		Count(&usage.PaymentAccounts).Error; err != nil {
+		return usage, err
+	}
+	// Joined without a deleted_at filter on the payment account: a method
+	// still pointing at a deleted payment account resolves to this chart
+	// account all the same.
+	var defaults, overrides int64
+	if err := tx.Table("payment_methods pm").
+		Joins("JOIN payment_accounts pa ON pa.id = pm.default_payment_account_id AND pa.business_id = pm.business_id").
+		Where("pm.business_id = ? AND pa.chart_account_id = ? AND pm.deleted_at IS NULL", businessID, accountID).
+		Count(&defaults).Error; err != nil {
+		return usage, err
+	}
+	if err := tx.Table("payment_method_account_mappings pmam").
+		Joins("JOIN payment_accounts pa ON pa.id = pmam.payment_account_id AND pa.business_id = pmam.business_id").
+		Where("pmam.business_id = ? AND pa.chart_account_id = ? AND pmam.deleted_at IS NULL", businessID, accountID).
+		Count(&overrides).Error; err != nil {
+		return usage, err
+	}
+	usage.PaymentMethodLinks = defaults + overrides
+	return usage, nil
+}
+
 // AccountIDsWithJournalLines answers the same question for a page of accounts
 // in one query, so the list endpoint can flag which rows are still
 // reclassifiable without an N+1.
@@ -2370,6 +2424,18 @@ func (r *Repository) CountPaymentMethodsUsingPaymentAccount(tx *gorm.DB, busines
 	var count int64
 	err := tx.Table("payment_methods").
 		Where("business_id = ? AND default_payment_account_id = ? AND deleted_at IS NULL", businessID, id).
+		Count(&count).Error
+	return count, err
+}
+
+// CountBranchPaymentMethodsUsingPaymentAccount counts branch overrides that
+// route a payment method to this account. Checkout resolves the override
+// before the method's default, so a deleted account behind one leaves that
+// branch's till with nowhere to post the method. (ISSUE-079)
+func (r *Repository) CountBranchPaymentMethodsUsingPaymentAccount(tx *gorm.DB, businessID, id string) (int64, error) {
+	var count int64
+	err := tx.Table("payment_method_account_mappings").
+		Where("business_id = ? AND payment_account_id = ? AND deleted_at IS NULL", businessID, id).
 		Count(&count).Error
 	return count, err
 }
