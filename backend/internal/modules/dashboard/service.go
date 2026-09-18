@@ -148,6 +148,12 @@ func (s *Service) PurchasingDashboard(currentUser *utils.AuthContext, values url
 }
 
 func (s *Service) RecentActivity(currentUser *utils.AuthContext, values url.Values) ([]ActivityFeedItem, error) {
+	// The feed is the audit trail: staff logins, users created and deleted,
+	// role changes. The Audit Logs page needs audit_logs.view for exactly this
+	// data, and dashboard.view alone let a till-only role read it (ISSUE-067).
+	if !hasAnyPermission(currentUser, "audit_logs.view") {
+		return nil, apperrors.Forbidden("recent activity needs audit_logs.view")
+	}
 	scope, err := resolveScope(currentUser, values)
 	if err != nil {
 		return nil, err

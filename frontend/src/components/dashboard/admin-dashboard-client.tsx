@@ -371,8 +371,10 @@ function periodDelta(
 }
 
 export function AdminDashboardClient(): JSX.Element {
-  const { hasAnyPermission } = usePermission();
+  const { hasAnyPermission, hasPermission } = usePermission();
   const branchScope = useBranchScope();
+  // The activity table is the audit trail (ISSUE-067).
+  const canViewActivity = hasPermission(PERMISSIONS.auditLogsView);
   const [performanceView, setPerformanceView] = useState<PerformanceView>("Sales");
   const canView = hasAnyPermission([
     PERMISSIONS.dashboardView,
@@ -401,7 +403,7 @@ export function AdminDashboardClient(): JSX.Element {
   const branchesQuery = useReportBranches(canView && branchScope.canAccessAllBranches);
   const dashboardQuery = useAdminDashboard(appliedFilters, canLoadDashboard);
   const alertsQuery = useDashboardAlerts({ timezone }, canLoadDashboard);
-  const activityQuery = useRecentActivity(canLoadDashboard);
+  const activityQuery = useRecentActivity(canLoadDashboard && canViewActivity);
   const salesChartQuery = useSalesChart(appliedFilters, canLoadDashboard);
   const paymentsChartQuery = usePaymentsChart(appliedFilters, canLoadDashboard);
   const ordersChartQuery = useOrdersChart(appliedFilters, canLoadDashboard);
@@ -437,7 +439,8 @@ export function AdminDashboardClient(): JSX.Element {
     void Promise.all([
       dashboardQuery.refetch(),
       alertsQuery.refetch(),
-      activityQuery.refetch(),
+      // refetch() ignores `enabled`, so it must not run for a role without the feed.
+      canViewActivity ? activityQuery.refetch() : undefined,
       salesChartQuery.refetch(),
       paymentsChartQuery.refetch(),
       ordersChartQuery.refetch(),
@@ -739,12 +742,14 @@ export function AdminDashboardClient(): JSX.Element {
             ) : null}
           </section>
 
-          <ActivityTable
-            activities={activityQuery.data}
-            error={activityQuery.error}
-            isLoading={activityQuery.isLoading}
-            onRetry={() => void activityQuery.refetch()}
-          />
+          {canViewActivity ? (
+            <ActivityTable
+              activities={activityQuery.data}
+              error={activityQuery.error}
+              isLoading={activityQuery.isLoading}
+              onRetry={() => void activityQuery.refetch()}
+            />
+          ) : null}
 
           <div className="grid gap-3 border-t border-border pt-4 text-xs text-foreground-muted sm:grid-cols-3">
             <span className="flex items-center gap-2">
