@@ -231,6 +231,10 @@ func (s *Service) Delete(currentUser *utils.AuthContext, id, ipAddress, userAgen
 		if err := s.repo.UpdateRecipe(tx, id, currentUser.BusinessID, branchID, map[string]interface{}{"status": "archived", "is_active": false, "deleted_at": gorm.DeletedAt{Time: time.Now().UTC(), Valid: true}, "updated_by_user_id": currentUser.UserID, "updated_at": time.Now().UTC()}); err != nil {
 			return notFound(err, "recipe not found")
 		}
+		// The lines go with the recipe (ISSUE-091).
+		if err := s.repo.DeleteRecipeLines(tx, id, currentUser.BusinessID, branchID); err != nil {
+			return err
+		}
 		return s.audit(tx, currentUser, "recipe.deleted", id, "Recipe deleted", ipAddress, userAgent)
 	})
 }

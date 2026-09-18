@@ -76,6 +76,31 @@ export function stockLocationDeleteConfirmation(name: string): DeleteConfirmatio
   };
 }
 
+/**
+ * A saved recipe line was deleted on one click with only a toast afterwards
+ * (ISSUE-091). Removing a line changes the recipe's cost, which can move the
+ * product's cost and, with automatic pricing, its price.
+ */
+export function recipeLineDeleteConfirmation(
+  kind: "ingredient" | "packaging",
+  lineName: string,
+): DeleteConfirmation {
+  return {
+    title: `Remove ${lineName} from this recipe?`,
+    consequence: `The ${kind} line is deleted and the recipe's estimated cost is recalculated without it. Batches already produced keep their records.`,
+    confirmLabel: kind === "ingredient" ? "Remove ingredient" : "Remove packaging",
+    cancelLabel: "Keep line",
+  };
+}
+
+/**
+ * Deleting a recipe now removes its lines too (ISSUE-091); before, they stayed
+ * behind and kept the ingredients on them from being deleted.
+ */
+export function recipeDeleteConsequence(recipeName: string): string {
+  return `${recipeName} and its ingredient and packaging lines are removed, and it stops driving its product's cost. Batches already produced keep their records.`;
+}
+
 /** The packaging counterpart of ingredientDeleteConfirmation (ISSUE-083). */
 export function packagingDeleteConfirmation(name: string): DeleteConfirmation {
   return {
