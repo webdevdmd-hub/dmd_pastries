@@ -39,7 +39,11 @@ func funcBody(t *testing.T, src, signature string) string {
 
 func TestHardDeleteRemovesTheLoginBeforeCommitting(t *testing.T) {
 	body := funcBody(t, superadminSource(t), "func (s *Service) hardDeleteUser(")
+	deferred := strings.Index(body, "SET CONSTRAINTS ALL IMMEDIATE")
 	login := strings.Index(body, "s.identities.DeleteUser(loginOf(before.User))")
+	if deferred < 0 || deferred > login {
+		t.Fatal("deferred references must be checked before the login is removed")
+	}
 	commit := strings.Index(body, "tx.Commit()")
 	if login < 0 {
 		t.Fatal("hard delete does not remove the user's login")
