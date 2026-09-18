@@ -3,25 +3,36 @@ import Link from "next/link";
 import type { JSX } from "react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { usePermission } from "@/hooks/use-permission";
+import { quickActionsAllowed } from "@/lib/dashboard/quick-actions";
 
 export type DashboardQuickAction = {
   href: string;
   icon: LucideIcon;
   label: string;
+  /** Every permission the destination needs; the action shows only when all are held. */
+  requires: readonly string[];
 };
 
 export function DashboardQuickActions({
   actions,
 }: {
   actions: DashboardQuickAction[];
-}): JSX.Element {
+}): JSX.Element | null {
+  const { hasPermission } = usePermission();
+  const allowed = quickActionsAllowed(actions, hasPermission);
+
+  if (allowed.length === 0) {
+    return null;
+  }
+
   return (
     <Card className="bg-card shadow-xs">
       <CardHeader>
         <CardTitle className="text-foreground">Quick Actions</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-3 sm:grid-cols-2">
-        {actions.map((action) => {
+        {allowed.map((action) => {
           const Icon = action.icon;
           return (
             <Link

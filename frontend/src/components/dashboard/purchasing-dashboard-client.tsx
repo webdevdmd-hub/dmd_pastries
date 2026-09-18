@@ -21,10 +21,30 @@ import { usePermission } from "@/hooks/use-permission";
 import { getErrorMessage } from "@/lib/api/client";
 
 const actions = [
-  { href: ROUTES.purchasingOrders, icon: ShoppingCart, label: "Create Purchase Order" },
-  { href: ROUTES.purchasingReceipts, icon: PackageOpen, label: "Receive Stock" },
-  { href: ROUTES.suppliers, icon: Truck, label: "View Suppliers" },
-  { href: ROUTES.inventoryLowStock, icon: PackageSearch, label: "View Low Stock" },
+  {
+    href: ROUTES.purchasingOrders,
+    icon: ShoppingCart,
+    label: "Create Purchase Order",
+    requires: [PERMISSIONS.purchasingView, PERMISSIONS.purchasingOrdersCreate],
+  },
+  {
+    href: ROUTES.purchasingReceipts,
+    icon: PackageOpen,
+    label: "Receive Stock",
+    requires: [PERMISSIONS.purchasingView, PERMISSIONS.purchasingReceiptsCreate],
+  },
+  {
+    href: ROUTES.suppliers,
+    icon: Truck,
+    label: "View Suppliers",
+    requires: [PERMISSIONS.suppliersView],
+  },
+  {
+    href: ROUTES.inventoryLowStock,
+    icon: PackageSearch,
+    label: "View Low Stock",
+    requires: [PERMISSIONS.inventoryView],
+  },
 ] as const;
 
 export function PurchasingDashboardClient(): JSX.Element {

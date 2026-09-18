@@ -48,6 +48,7 @@ import {
   useSalesChart,
 } from "@/hooks/use-reports";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
+import { quickActionsAllowed } from "@/lib/dashboard/quick-actions";
 import {
   createDefaultDashboardDraft,
   resolveDashboardTimezone,
@@ -59,10 +60,25 @@ import type { ManufacturingReportFilters } from "@/types/manufacturing-reports";
 import type { ReportFilters } from "@/types/reports";
 
 const actions = [
-  { href: ROUTES.pos, icon: ReceiptText, label: "Open POS" },
-  { href: ROUTES.orders, icon: ShoppingBag, label: "Create bakery order" },
-  { href: ROUTES.manufacturing, icon: Factory, label: "Start production" },
-  { href: ROUTES.expenses, icon: CreditCard, label: "Record expense" },
+  { href: ROUTES.pos, icon: ReceiptText, label: "Open POS", requires: [PERMISSIONS.posView] },
+  {
+    href: ROUTES.orders,
+    icon: ShoppingBag,
+    label: "Create bakery order",
+    requires: [PERMISSIONS.ordersView, PERMISSIONS.ordersCreate],
+  },
+  {
+    href: ROUTES.manufacturing,
+    icon: Factory,
+    label: "Start production",
+    requires: [PERMISSIONS.manufacturingView, PERMISSIONS.manufacturingBatchesCreate],
+  },
+  {
+    href: ROUTES.expenses,
+    icon: CreditCard,
+    label: "Record expense",
+    requires: [PERMISSIONS.expensesView, PERMISSIONS.expensesCreate],
+  },
 ] as const;
 
 const performanceViews = ["Sales", "Orders", "Production", "Inventory", "Finance"] as const;
@@ -375,6 +391,7 @@ export function AdminDashboardClient(): JSX.Element {
   const branchScope = useBranchScope();
   // The activity table is the audit trail (ISSUE-067).
   const canViewActivity = hasPermission(PERMISSIONS.auditLogsView);
+  const allowedActions = quickActionsAllowed(actions, hasPermission);
   const [performanceView, setPerformanceView] = useState<PerformanceView>("Sales");
   const canView = hasAnyPermission([
     PERMISSIONS.dashboardView,
@@ -587,22 +604,26 @@ export function AdminDashboardClient(): JSX.Element {
 
           <DashboardKpiGrid items={decisionMetrics} />
 
-          <section className="flex flex-wrap items-center gap-2 border-y border-border py-3">
-            <span className="mr-2 text-meta font-medium text-foreground-muted">Quick actions</span>
-            {actions.map((action) => {
-              const Icon = action.icon;
-              return (
-                <Link
-                  className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-card px-3 text-sm font-semibold text-foreground hover:bg-muted"
-                  href={action.href}
-                  key={action.href}
-                >
-                  <Icon className="h-4 w-4 text-foreground-muted" />
-                  {action.label}
-                </Link>
-              );
-            })}
-          </section>
+          {allowedActions.length > 0 ? (
+            <section className="flex flex-wrap items-center gap-2 border-y border-border py-3">
+              <span className="mr-2 text-meta font-medium text-foreground-muted">
+                Quick actions
+              </span>
+              {allowedActions.map((action) => {
+                const Icon = action.icon;
+                return (
+                  <Link
+                    className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-card px-3 text-sm font-semibold text-foreground hover:bg-muted"
+                    href={action.href}
+                    key={action.href}
+                  >
+                    <Icon className="h-4 w-4 text-foreground-muted" />
+                    {action.label}
+                  </Link>
+                );
+              })}
+            </section>
+          ) : null}
 
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(19rem,0.6fr)]">
             <AttentionQueue

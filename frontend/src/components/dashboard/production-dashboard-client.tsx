@@ -23,10 +23,30 @@ import type { DashboardRequestFilters } from "@/lib/api/dashboard";
 import { resolveDashboardTimezone } from "@/lib/reports/dashboard-filters";
 
 const actions = [
-  { href: ROUTES.manufacturingBatches, icon: Boxes, label: "Create Production" },
-  { href: ROUTES.manufacturingBatches, icon: Soup, label: "View Manufacturing" },
-  { href: ROUTES.recipes, icon: ListChecks, label: "View Recipe List" },
-  { href: ROUTES.reportsBakeryOrdersProductionSchedule, icon: Clock, label: "View Schedule" },
+  {
+    href: ROUTES.manufacturingBatches,
+    icon: Boxes,
+    label: "Create Production",
+    requires: [PERMISSIONS.manufacturingView, PERMISSIONS.manufacturingBatchesCreate],
+  },
+  {
+    href: ROUTES.manufacturingBatches,
+    icon: Soup,
+    label: "View Manufacturing",
+    requires: [PERMISSIONS.manufacturingView],
+  },
+  {
+    href: ROUTES.recipes,
+    icon: ListChecks,
+    label: "View Recipe List",
+    requires: [PERMISSIONS.recipesView],
+  },
+  {
+    href: ROUTES.reportsBakeryOrdersProductionSchedule,
+    icon: Clock,
+    label: "View Schedule",
+    requires: [PERMISSIONS.reportsView, PERMISSIONS.ordersView],
+  },
 ] as const;
 
 export function ProductionDashboardClient(): JSX.Element {
