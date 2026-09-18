@@ -60,6 +60,55 @@ func (r *Repository) Update(tx *gorm.DB, productID, variantID, businessID string
 	return nil
 }
 
+// VariantUses reports what outside the inventory still points at a variant,
+// in words for a refusal message. Its stock is the inventory module's to
+// answer (inventory.Repository.StockUses).
+//
+// A sale, an order or a recipe keeps the variant's id; deleting the variant
+// under them left receipts and recipes showing a blank variant name
+// (ISSUE-084).
+func (r *Repository) VariantUses(tx *gorm.DB, businessID, variantID string) ([]string, error) {
+	checks := []struct {
+		label string
+		query string
+	}{
+		{"sales", `SELECT COUNT(*) FROM sale_items si
+			JOIN sales s ON s.id = si.sale_id
+			WHERE si.business_id = ? AND si.product_variant_id = ? AND s.deleted_at IS NULL`},
+		{"held sales", `SELECT COUNT(*) FROM held_sale_items hsi
+			JOIN held_sales hs ON hs.id = hsi.held_sale_id
+			WHERE hsi.business_id = ? AND hsi.product_variant_id = ? AND hs.status = 'held' AND hs.deleted_at IS NULL`},
+		{"bakery orders", `SELECT COUNT(*) FROM bakery_order_items boi
+			JOIN bakery_orders bo ON bo.id = boi.bakery_order_id
+			WHERE boi.business_id = ? AND boi.product_variant_id = ? AND boi.deleted_at IS NULL AND bo.deleted_at IS NULL`},
+		{"production batches", `SELECT COUNT(*) FROM production_batches
+			WHERE business_id = ? AND product_variant_id = ? AND deleted_at IS NULL`},
+		{"a recipe that makes it", `SELECT COUNT(*) FROM recipes
+			WHERE business_id = ? AND product_variant_id = ? AND deleted_at IS NULL`},
+		{"recipes using it", `SELECT COUNT(*) FROM recipe_ingredients ri
+			JOIN recipes r ON r.id = ri.recipe_id
+			WHERE ri.business_id = ? AND ri.component_variant_id = ? AND ri.deleted_at IS NULL AND r.deleted_at IS NULL`},
+		{"recipes using it", `SELECT COUNT(*) FROM recipe_packaging rp
+			JOIN recipes r ON r.id = rp.recipe_id
+			WHERE rp.business_id = ? AND rp.component_variant_id = ? AND rp.deleted_at IS NULL AND r.deleted_at IS NULL`},
+	}
+
+	uses := make([]string, 0)
+	for _, check := range checks {
+		if len(uses) > 0 && uses[len(uses)-1] == check.label {
+			continue
+		}
+		var count int64
+		if err := tx.Raw(check.query, businessID, variantID).Scan(&count).Error; err != nil {
+			return nil, err
+		}
+		if count > 0 {
+			uses = append(uses, check.label)
+		}
+	}
+	return uses, nil
+}
+
 func (r *Repository) SKUExists(businessID, sku, excludedVariantID string) (bool, error) {
 	return r.variantValueExists("sku", businessID, sku, excludedVariantID)
 }

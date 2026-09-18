@@ -28,6 +28,24 @@ export function ingredientDeleteConfirmation(name: string): DeleteConfirmation {
   };
 }
 
+/**
+ * A variant was deleted on one click, with no question asked, while its
+ * inventory row stayed behind and sales, orders and recipes that named it
+ * showed a blank variant (ISSUE-084). The server now refuses a used variant
+ * and retires an unused one's stock record with it.
+ */
+export function variantDeleteConfirmation(
+  productName: string,
+  variantName: string,
+): DeleteConfirmation {
+  return {
+    title: `Delete ${variantName}?`,
+    consequence: `${variantName} is removed from ${productName} and from the till, and its empty stock record leaves inventory with it. A variant with sales, orders, stock on hand, stock movements or a recipe cannot be deleted; set it to inactive instead.`,
+    confirmLabel: "Delete variant",
+    cancelLabel: "Keep variant",
+  };
+}
+
 /** The packaging counterpart of ingredientDeleteConfirmation (ISSUE-083). */
 export function packagingDeleteConfirmation(name: string): DeleteConfirmation {
   return {
