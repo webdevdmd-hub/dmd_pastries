@@ -1,5 +1,5 @@
 /**
- * What each catalogue delete tells the person before it runs, in one place so
+ * What each catalogue and stock delete tells the person before it runs, in one place so
  * the words can be checked against what the server actually does
  * (scripts/check-delete-confirmations.mjs).
  *
@@ -43,6 +43,21 @@ export function variantDeleteConfirmation(
     consequence: `${variantName} is removed from ${productName} and from the till, and its empty stock record leaves inventory with it. A variant with sales, orders, stock on hand, stock movements or a recipe cannot be deleted; set it to inactive instead.`,
     confirmLabel: "Delete variant",
     cancelLabel: "Keep variant",
+  };
+}
+
+/**
+ * Stock locations deleted on one click, and a draft transfer completing
+ * afterwards could land stock on the deleted location (ISSUE-085). The server
+ * now refuses while the location holds stock, is on a draft transfer, or is
+ * the default.
+ */
+export function stockLocationDeleteConfirmation(name: string): DeleteConfirmation {
+  return {
+    title: `Delete ${name}?`,
+    consequence: `${name} is removed from your stock locations. A location that still holds stock or is on a draft transfer cannot be deleted; move its stock out and complete or cancel the transfer first. The default location cannot be deleted.`,
+    confirmLabel: "Delete location",
+    cancelLabel: "Keep location",
   };
 }
 

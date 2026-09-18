@@ -338,6 +338,17 @@ func (r *Repository) StockLocationHasStock(tx *gorm.DB, businessID, locationID s
 	return count > 0, err
 }
 
+// StockLocationHasOpenTransfers reports whether a draft transfer still moves
+// stock out of or into the location. Completing it later would land stock on
+// a location that no longer exists (ISSUE-085).
+func (r *Repository) StockLocationHasOpenTransfers(tx *gorm.DB, businessID, locationID string) (bool, error) {
+	var count int64
+	err := tx.Model(&StockTransfer{}).
+		Where("business_id = ? AND status = ? AND (from_stock_location_id = ? OR to_stock_location_id = ?)", businessID, "draft", locationID, locationID).
+		Count(&count).Error
+	return count > 0, err
+}
+
 func (r *Repository) StockLocationCodeExists(businessID, branchID, code, excludeID string) (bool, error) {
 	query := r.db.Model(&StockLocation{}).
 		Where("business_id = ? AND branch_id = ? AND LOWER(location_code) = LOWER(?) AND deleted_at IS NULL", businessID, branchID, code)
